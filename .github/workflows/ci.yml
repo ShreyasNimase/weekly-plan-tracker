@@ -1,0 +1,37 @@
+name: Weekly Plan Tracker CI
+
+on:
+  pull_request:
+    branches: ["develop", "main"]
+
+jobs:
+  build-backend:
+    name: Build & Test Backend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Restore, Build & Test
+        run: |
+          cd backend
+          dotnet restore
+          dotnet build --configuration Release
+          dotnet test --configuration Release --verbosity normal
+
+  build-frontend:
+    name: Build Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Install & Build
+        run: |
+          cd frontend/weekly-planner-frontend
+          npm ci
+          npm run build -- --configuration production
