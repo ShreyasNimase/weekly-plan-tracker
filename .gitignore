@@ -1,0 +1,23 @@
+# .NET
+backend/bin/
+backend/obj/
+backend/*.user
+backend/.vs/
+backend/**/.vs/
+backend/**/bin/
+backend/**/obj/
+*.suo
+*.user
+.vs/
+
+# Angular
+frontend/node_modules/
+frontend/dist/
+frontend/.angular/
+frontend/.env
+
+# General
+.DS_Store
+Thumbs.db
+*.log
+appsettings.Development.json
