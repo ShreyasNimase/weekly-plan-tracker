@@ -48,3 +48,37 @@ jobs:
           app_location: "frontend/weekly-planner-frontend"
           output_location: "dist/weekly-planner-frontend/browser"
           skip_app_build: true
+
+  build_and_deploy_backend:
+    runs-on: ubuntu-latest
+    name: Build and Deploy .NET API
+    if: github.event_name == 'push'
+
+    steps:
+      # Checkout code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Setup .NET 10
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      # Restore, Build & Publish
+      - name: Restore dependencies
+        run: dotnet restore backend/WeeklyPlanner.slnx
+
+      - name: Build
+        run: dotnet build backend/WeeklyPlanner.slnx --configuration Release --no-restore
+
+      - name: Publish
+        run: dotnet publish backend/WeeklyPlanner.API/WeeklyPlanner.API.csproj --configuration Release --no-build --output ./publish
+
+      # Deploy to Azure App Service
+      - name: Deploy to Azure App Service
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: "weekly-planner-api-01"
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: ./publish
