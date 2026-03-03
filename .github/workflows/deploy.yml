@@ -1,0 +1,50 @@
+name: Azure Static Web Apps CI/CD
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build_and_deploy:
+    runs-on: ubuntu-latest
+    name: Build and Deploy Angular App
+
+    steps:
+      # Checkout code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      # Setup Node
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      # Install dependencies
+      - name: Install dependencies
+        run: |
+          cd frontend/weekly-planner-frontend
+          npm ci
+
+      # Build Angular (production)
+      - name: Build Angular app
+        run: |
+          cd frontend/weekly-planner-frontend
+          npm run build -- --configuration production
+
+      # Deploy to Azure Static Web Apps
+      - name: Deploy to Azure Static Web Apps
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_WITTY_ISLAND_0EFFF4F00 }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: "upload"
+          app_location: "frontend/weekly-planner-frontend"
+          output_location: "dist/weekly-planner-frontend/browser"
+          skip_app_build: true
