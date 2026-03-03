@@ -1,0 +1,84 @@
+name: Azure Static Web Apps CI/CD
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build_and_deploy:
+    runs-on: ubuntu-latest
+    name: Build and Deploy Angular App
+
+    steps:
+      # Checkout code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      # Setup Node
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      # Install dependencies
+      - name: Install dependencies
+        run: |
+          cd frontend/weekly-planner-frontend
+          npm ci
+
+      # Build Angular (production)
+      - name: Build Angular app
+        run: |
+          cd frontend/weekly-planner-frontend
+          npm run build -- --configuration production
+
+      # Deploy to Azure Static Web Apps
+      - name: Deploy to Azure Static Web Apps
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_WITTY_ISLAND_0EFFF4F00 }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: "upload"
+          app_location: "frontend/weekly-planner-frontend/dist/weekly-planner-frontend/browser"
+          output_location: ""
+          skip_app_build: true
+
+  build_and_deploy_backend:
+    runs-on: ubuntu-latest
+    name: Build and Deploy .NET API
+    if: github.event_name == 'push'
+
+    steps:
+      # Checkout code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Setup .NET 10
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      # Restore, Build & Publish
+      - name: Restore dependencies
+        run: dotnet restore backend/WeeklyPlanner.slnx
+
+      - name: Build
+        run: dotnet build backend/WeeklyPlanner.slnx --configuration Release --no-restore
+
+      - name: Publish
+        run: dotnet publish backend/WeeklyPlanner.API/WeeklyPlanner.API.csproj --configuration Release --no-build --output ./publish
+
+      # Deploy to Azure App Service
+      - name: Deploy to Azure App Service
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: "weekly-planner-api-01"
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: ./publish
