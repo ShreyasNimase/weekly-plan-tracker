@@ -22,11 +22,153 @@ namespace WeeklyPlanner.Infrastructure.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("WeeklyPlanner.Core.Entities.BacklogItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Category")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal?>("EstimatedHours")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("Priority")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("BacklogItems");
+                });
+
+            modelBuilder.Entity("WeeklyPlanner.Core.Entities.CategoryBudget", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Category")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("CycleId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("HoursBudget")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("Percentage")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CycleId");
+
+                    b.ToTable("CategoryBudgets");
+                });
+
+            modelBuilder.Entity("WeeklyPlanner.Core.Entities.CycleMember", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("AllocatedHours")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid>("CycleId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsReady")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid>("TeamMemberId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TeamMemberId");
+
+                    b.HasIndex("CycleId", "TeamMemberId")
+                        .IsUnique();
+
+                    b.ToTable("CycleMembers");
+                });
+
+            modelBuilder.Entity("WeeklyPlanner.Core.Entities.PlanningCycle", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("WeekStartDate")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("PlanningCycles");
+                });
+
+            modelBuilder.Entity("WeeklyPlanner.Core.Entities.TaskAssignment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("BacklogItemId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("CycleMemberId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("PlannedHours")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BacklogItemId");
+
+                    b.HasIndex("CycleMemberId", "BacklogItemId")
+                        .IsUnique();
+
+                    b.ToTable("TaskAssignments");
+                });
+
             modelBuilder.Entity("WeeklyPlanner.Core.Entities.TeamMember", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
@@ -41,6 +183,67 @@ namespace WeeklyPlanner.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("TeamMembers");
+                });
+
+            modelBuilder.Entity("WeeklyPlanner.Core.Entities.CategoryBudget", b =>
+                {
+                    b.HasOne("WeeklyPlanner.Core.Entities.PlanningCycle", "Cycle")
+                        .WithMany("CategoryBudgets")
+                        .HasForeignKey("CycleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Cycle");
+                });
+
+            modelBuilder.Entity("WeeklyPlanner.Core.Entities.CycleMember", b =>
+                {
+                    b.HasOne("WeeklyPlanner.Core.Entities.PlanningCycle", "Cycle")
+                        .WithMany("CycleMembers")
+                        .HasForeignKey("CycleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("WeeklyPlanner.Core.Entities.TeamMember", "TeamMember")
+                        .WithMany()
+                        .HasForeignKey("TeamMemberId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Cycle");
+
+                    b.Navigation("TeamMember");
+                });
+
+            modelBuilder.Entity("WeeklyPlanner.Core.Entities.TaskAssignment", b =>
+                {
+                    b.HasOne("WeeklyPlanner.Core.Entities.BacklogItem", "BacklogItem")
+                        .WithMany()
+                        .HasForeignKey("BacklogItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("WeeklyPlanner.Core.Entities.CycleMember", "CycleMember")
+                        .WithMany("TaskAssignments")
+                        .HasForeignKey("CycleMemberId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("BacklogItem");
+
+                    b.Navigation("CycleMember");
+                });
+
+            modelBuilder.Entity("WeeklyPlanner.Core.Entities.CycleMember", b =>
+                {
+                    b.Navigation("TaskAssignments");
+                });
+
+            modelBuilder.Entity("WeeklyPlanner.Core.Entities.PlanningCycle", b =>
+                {
+                    b.Navigation("CategoryBudgets");
+
+                    b.Navigation("CycleMembers");
                 });
 #pragma warning restore 612, 618
         }
