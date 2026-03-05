@@ -12,10 +12,21 @@ builder.Services.AddSwaggerGen();
 
 // EF Core — SQL Server
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"),
+    sqlOptions =>
+        {
+            sqlOptions.EnableRetryOnFailure(
+                maxRetryCount: 5,
+                maxRetryDelay: TimeSpan.FromSeconds(10),
+                errorNumbersToAdd: null);
+        }
+        ));
 
 // Repositories
 builder.Services.AddScoped<ITeamMemberRepository, TeamMemberRepository>();
+builder.Services.AddScoped<IBacklogRepository, BacklogRepository>();
+builder.Services.AddScoped<ICycleRepository, CycleRepository>();
+builder.Services.AddScoped<IAssignmentRepository, AssignmentRepository>();
 
 // CORS — origins from appsettings.json "Cors:AllowedOrigins"
 var allowedOrigins = builder.Configuration
