@@ -6,4 +6,5 @@ public class TeamMember
     public string Name { get; set; } = string.Empty;
     public bool IsLead { get; set; }
     public bool IsActive { get; set; } = true;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
