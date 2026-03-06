@@ -93,7 +93,7 @@
         <button mat-icon-button (click)="editItem(item)" matTooltip="Edit">
           <mat-icon>edit</mat-icon>
         </button>
-        @if (item.status?.toUpperCase() !== 'ARCHIVED') {
+        @if (item.status.toUpperCase() !== 'ARCHIVED') {
         <button mat-icon-button color="warn" (click)="archiveItem(item)" matTooltip="Archive">
           <mat-icon>archive</mat-icon>
         </button>
