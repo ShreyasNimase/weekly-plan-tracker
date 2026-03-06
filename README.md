@@ -3,8 +3,8 @@
 A full-stack web application that helps engineering teams plan and track their weekly sprint work. A **Team Lead** manages the planning cycle, and **team members** pick backlog items and commit hours each week.
 
 **Live URLs**
-- 🌐 Frontend: [weekly-planner-frontend-01.azurestaticapps.net](https://weekly-planner-frontend-01.azurestaticapps.net)
-- 🔌 API: [weekly-planner-api-01.azurewebsites.net/api](https://weekly-planner-api-01.azurewebsites.net/api)
+- 🌐 Frontend: [witty-island-0efff4f00.1.azurestaticapps.net](https://witty-island-0efff4f00.1.azurestaticapps.net)
+- 🔌 API: [weekly-planner-api-01-ebemgka8hmaza0hy.centralindia-01.azurewebsites.net/api](https://weekly-planner-api-01-ebemgka8hmaza0hy.centralindia-01.azurewebsites.net/api)
 
 ---
 
@@ -63,6 +63,64 @@ SETUP ──▶ PLANNING ──▶ FROZEN ──▶ COMPLETED
 - **FluentValidation** — request validation
 - **Azure SQL Database** — data store
 - Deployed to **Azure App Service**
+
+---
+
+## 🏛️ Architecture
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                        Azure Cloud                               │
+│                                                                  │
+│  ┌─────────────────────┐         ┌─────────────────────────┐     │
+│  │  Azure Static Web   │  HTTPS  │   Azure App Service     │     │
+│  │       Apps          │ ──────► │   (.NET 10 API)         │     │
+│  │                     │         │                         │     │
+│  │  Angular 21 SPA     │  ◄───── │  REST JSON responses   │     │
+│  │  (HTML/JS/CSS)      │         │                         │     │
+│  └─────────────────────┘         └────────┬────────────────┘     │
+│                                           │                      │
+│                                           │ EF Core              │
+│                                           ▼                      │
+│                                  ┌─────────────────┐             │
+│                                  │  Azure SQL DB   │             │
+│                                  │  (SQL Server)   │             │
+│                                  └─────────────────┘             │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### Backend — Clean Architecture
+
+```
+┌──────────────────────────────────────────────────┐
+│  WeeklyPlanner.API        (Presentation Layer)   │
+│  └── Controllers, Program.cs, appsettings        │
+├──────────────────────────────────────────────────┤
+│  WeeklyPlanner.Core       (Domain/Business)      │
+│  └── Entities, DTOs, Interfaces, Validators      │
+├──────────────────────────────────────────────────┤
+│  WeeklyPlanner.Infrastructure  (Data Layer)      │
+│  └── DbContext, Repositories, Service Impls      │
+├──────────────────────────────────────────────────┤
+│  WeeklyPlanner.Tests      (Unit Tests)           │
+│  └── xUnit + Moq + EF InMemory                  │
+└──────────────────────────────────────────────────┘
+```
+
+### Frontend — Feature-based Structure
+
+```
+Angular App
+├── core/services/       → HTTP services (AuthService, CycleService…)
+├── features/            → Lazy-loaded page modules
+│   ├── home/            → Landing page with role-specific cards
+│   ├── planning/        → Plan My Work + Pick from Backlog
+│   ├── backlog/         → Manage Backlog (CRUD + filters)
+│   ├── cycle/           → Cycle Setup + Freeze Review
+│   ├── dashboard/       → Category & member drill-down
+│   └── progress/        → Task progress updates (frozen phase)
+└── shared/              → Models, enums, reusable components
+```
 
 ---
 
