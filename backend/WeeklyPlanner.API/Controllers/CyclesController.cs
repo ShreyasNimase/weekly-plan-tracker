@@ -1,241 +1,150 @@
 using Microsoft.AspNetCore.Mvc;
 using WeeklyPlanner.Core.DTOs;
-using WeeklyPlanner.Core.Entities;
-using WeeklyPlanner.Core.Enums;
-using WeeklyPlanner.Core.Interfaces;
+using WeeklyPlanner.Core.Services;
 
 namespace WeeklyPlanner.API.Controllers;
 
+/// <summary>APIs for planning cycles. Only one active cycle (SETUP, PLANNING, FROZEN) at a time.</summary>
 [ApiController]
 [Route("api/cycles")]
 public class CyclesController : ControllerBase
 {
-    private readonly ICycleRepository _cycles;
-    private readonly ITeamMemberRepository _members;
+    private readonly ICycleService _service;
 
-    public CyclesController(ICycleRepository cycles, ITeamMemberRepository members)
+    public CyclesController(ICycleService service)
     {
-        _cycles  = cycles;
-        _members = members;
+        _service = service;
     }
 
-    // ─────────────────────────────────────────────
-    // 14. POST /api/cycles/start — Start New Week
-    // ─────────────────────────────────────────────
+    /// <summary>Starts a new cycle (next Tuesday). Fails if there is already a week being planned.</summary>
+    /// <response code="201">Cycle created.</response>
+    /// <response code="400">Active cycle already exists.</response>
     [HttpPost("start")]
-    public async Task<IActionResult> StartCycle([FromBody] StartCycleDto dto)
+    [ProducesResponseType(typeof(CycleDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> Start(CancellationToken cancellationToken = default)
     {
-        if (!ModelState.IsValid)
-            return BadRequest(ModelState);
-
-        // ⚠ Business rule: week start must be a Tuesday
-        if (dto.WeekStartDate.DayOfWeek != DayOfWeek.Tuesday)
-            return BadRequest(new { message = "Week start date must be a Tuesday." });
-
-        // ⚠ Business rule: only one active cycle at a time
-        if (await _cycles.HasActiveCycleAsync())
-            return BadRequest(new { message = "An active planning cycle already exists. Complete or cancel it before starting a new one." });
-
-        var cycle = new PlanningCycle
-        {
-            WeekStartDate = dto.WeekStartDate.Date,
-            Status        = CycleStatus.Setup,
-            CreatedAt     = DateTime.UtcNow
-        };
-
-        var created = await _cycles.AddAsync(cycle);
-        return CreatedAtAction(nameof(GetActiveCycle), null, ToCycleResponse(created));
+        var (result, error) = await _service.StartAsync(cancellationToken);
+        if (error != null)
+            return BadRequest(new { message = error });
+        return CreatedAtAction(nameof(GetActive), null, result);
     }
 
-    // ─────────────────────────────────────────────
-    // 15. PUT /api/cycles/{id}/setup — Setup Members + Budgets
-    // ─────────────────────────────────────────────
+    /// <summary>Setup: planningDate (Tuesday), memberIds, categoryAllocations (exactly 3, sum 100). Replaces existing setup.</summary>
+    /// <response code="200">Setup applied.</response>
+    /// <response code="400">Validation failed.</response>
+    /// <response code="404">Cycle not found.</response>
     [HttpPut("{id:guid}/setup")]
-    public async Task<IActionResult> SetupCycle(Guid id, [FromBody] SetupCycleDto dto)
+    [ProducesResponseType(typeof(CycleDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Setup(Guid id, [FromBody] SetupCycleRequest request, CancellationToken cancellationToken = default)
     {
-        if (!ModelState.IsValid)
-            return BadRequest(ModelState);
-
-        var cycle = await _cycles.GetByIdAsync(id);
-        if (cycle is null)
-            return NotFound(new { message = $"Cycle '{id}' not found." });
-
-        if (cycle.Status != CycleStatus.Setup)
-            return BadRequest(new { message = $"Cannot configure a cycle in '{cycle.Status}' state. Only Setup cycles can be configured." });
-
-        // ⚠ Percentage must sum to exactly 100
-        var totalPct = dto.CategoryBudgets.Sum(b => b.Percentage);
-        if (Math.Round(totalPct, 2) != 100m)
-            return BadRequest(new { message = $"Category percentages must total 100%. Current total: {totalPct}%." });
-
-        // ⚠ All member IDs must exist and be active
-        var invalidMembers = new List<Guid>();
-        foreach (var memberId in dto.MemberIds.Distinct())
-        {
-            var m = await _members.GetByIdAsync(memberId);
-            if (m is null || !m.IsActive)
-                invalidMembers.Add(memberId);
-        }
-        if (invalidMembers.Count > 0)
-            return BadRequest(new { message = "One or more member IDs are invalid or inactive.", invalidIds = invalidMembers });
-
-        int memberCount = dto.MemberIds.Distinct().Count();
-        decimal totalHours = memberCount * 30m;
-
-        // Build replacement lists (repository handles the old-removal safely)
-        var newMembers = dto.MemberIds.Distinct().Select(memberId => new CycleMember
-        {
-            TeamMemberId   = memberId,
-            AllocatedHours = 30m
-        }).ToList();
-
-        var newBudgets = dto.CategoryBudgets.Select(budget => new CategoryBudget
-        {
-            Category    = budget.Category,
-            Percentage  = budget.Percentage,
-            HoursBudget = Math.Round(totalHours * budget.Percentage / 100m, 2)
-        }).ToList();
-
-        await _cycles.SetupMembersAndBudgetsAsync(cycle, newMembers, newBudgets);
-        return Ok(ToCycleResponse(cycle));
+        var (result, error) = await _service.SetupAsync(id, request, cancellationToken);
+        if (error == "Cycle not found.")
+            return NotFound(new { message = error });
+        if (error != null)
+            return BadRequest(new { message = error });
+        return Ok(result);
     }
 
-    // ─────────────────────────────────────────────
-    // 16. PUT /api/cycles/{id}/open — Open Planning
-    // ─────────────────────────────────────────────
+    /// <summary>Opens planning (SETUP → PLANNING).</summary>
+    /// <response code="200">Cycle in PLANNING.</response>
+    /// <response code="400">Invalid state or no members/allocations.</response>
+    /// <response code="404">Cycle not found.</response>
     [HttpPut("{id:guid}/open")]
-    public async Task<IActionResult> OpenPlanning(Guid id)
+    [ProducesResponseType(typeof(CycleDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Open(Guid id, CancellationToken cancellationToken = default)
     {
-        var cycle = await _cycles.GetByIdAsync(id);
-        if (cycle is null)
-            return NotFound(new { message = $"Cycle '{id}' not found." });
-
-        if (cycle.Status != CycleStatus.Setup)
-            return BadRequest(new { message = $"Cannot open planning from '{cycle.Status}' state. Cycle must be in Setup." });
-
-        if (!cycle.CycleMembers.Any())
-            return BadRequest(new { message = "Cannot open planning without any members. Run setup first." });
-
-        if (!cycle.CategoryBudgets.Any())
-            return BadRequest(new { message = "Cannot open planning without category budgets. Run setup first." });
-
-        cycle.Status = CycleStatus.Planning;
-        await _cycles.UpdateAsync(cycle);
-        return Ok(ToCycleResponse(cycle));
+        var (result, error) = await _service.OpenAsync(id, cancellationToken);
+        if (error == "Cycle not found.")
+            return NotFound(new { message = error });
+        if (error != null)
+            return BadRequest(new { message = error });
+        return Ok(result);
     }
 
-    // ─────────────────────────────────────────────
-    // 17. GET /api/cycles/active — Get Active Cycle
-    // ─────────────────────────────────────────────
+    /// <summary>Gets the active cycle (state SETUP, PLANNING, or FROZEN). Returns 204 if none.</summary>
+    /// <response code="200">Active cycle with CategoryAllocations, CycleMembers, MemberPlans.</response>
+    /// <response code="204">No active cycle.</response>
     [HttpGet("active")]
-    public async Task<IActionResult> GetActiveCycle()
+    [ProducesResponseType(typeof(CycleDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> GetActive(CancellationToken cancellationToken = default)
     {
-        var cycle = await _cycles.GetActiveAsync();
+        var cycle = await _service.GetActiveAsync(cancellationToken);
         if (cycle is null)
-            return NotFound(new { message = "No active planning cycle exists." });
-
-        return Ok(ToCycleResponse(cycle));
+            return NoContent();
+        return Ok(cycle);
     }
 
-    // ─────────────────────────────────────────────
-    // 18. PUT /api/cycles/{id}/freeze — Freeze Plan
-    // ─────────────────────────────────────────────
+    /// <summary>Freezes the plan (PLANNING → FROZEN). Validates each member 30h and each category budget.</summary>
+    /// <response code="200">Cycle frozen.</response>
+    /// <response code="400">Validation errors (member hours or category budget).</response>
+    /// <response code="404">Cycle not found.</response>
     [HttpPut("{id:guid}/freeze")]
-    public async Task<IActionResult> FreezePlan(Guid id)
+    [ProducesResponseType(typeof(CycleDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Freeze(Guid id, CancellationToken cancellationToken = default)
     {
-        var cycle = await _cycles.GetByIdAsync(id);
-        if (cycle is null)
-            return NotFound(new { message = $"Cycle '{id}' not found." });
-
-        if (cycle.Status != CycleStatus.Planning)
-            return BadRequest(new { message = $"Cannot freeze from '{cycle.Status}' state. Cycle must be in Planning." });
-
-        if (!cycle.CycleMembers.Any())
-            return BadRequest(new { message = "Cannot freeze: no members in cycle." });
-
-        // ⚠ Validate category % still sums to 100
-        var totalPct = cycle.CategoryBudgets.Sum(b => b.Percentage);
-        if (Math.Round(totalPct, 2) != 100m)
-            return BadRequest(new { message = $"Cannot freeze: category percentages total {totalPct}%, must be 100%." });
-
-        // NOTE: Full "each member = 30h" validation wires in once Member Planning APIs are done (Phase 4)
-
-        cycle.Status = CycleStatus.Frozen;
-        await _cycles.UpdateAsync(cycle);
-        return Ok(ToCycleResponse(cycle));
+        var (result, errors) = await _service.FreezeAsync(id, cancellationToken);
+        if (errors?.Count > 0)
+        {
+            if (errors.Count == 1 && errors[0] == "Cycle not found.")
+                return NotFound(new { message = errors[0] });
+            return BadRequest(new { errors });
+        }
+        if (result is null)
+            return BadRequest();
+        return Ok(result);
     }
 
-    // ─────────────────────────────────────────────
-    // 19. PUT /api/cycles/{id}/complete — Finish Week
-    // ─────────────────────────────────────────────
+    /// <summary>Completes the cycle (FROZEN → COMPLETED). Updates BacklogItem statuses.</summary>
+    /// <response code="200">Cycle completed.</response>
+    /// <response code="400">Invalid state.</response>
+    /// <response code="404">Cycle not found.</response>
     [HttpPut("{id:guid}/complete")]
-    public async Task<IActionResult> FinishWeek(Guid id)
+    [ProducesResponseType(typeof(CycleDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Complete(Guid id, CancellationToken cancellationToken = default)
     {
-        var cycle = await _cycles.GetByIdAsync(id);
-        if (cycle is null)
-            return NotFound(new { message = $"Cycle '{id}' not found." });
-
-        if (cycle.Status != CycleStatus.Frozen)
-            return BadRequest(new { message = $"Cannot complete from '{cycle.Status}' state. Cycle must be Frozen first." });
-
-        cycle.Status = CycleStatus.Completed;
-        await _cycles.UpdateAsync(cycle);
-        return Ok(ToCycleResponse(cycle));
+        var (result, error) = await _service.CompleteAsync(id, cancellationToken);
+        if (error == "Cycle not found.")
+            return NotFound(new { message = error });
+        if (error != null)
+            return BadRequest(new { message = error });
+        return Ok(result);
     }
 
-    // ─────────────────────────────────────────────
-    // 20. DELETE /api/cycles/{id} — Cancel Planning
-    // ─────────────────────────────────────────────
+    /// <summary>Deletes the cycle (only SETUP or PLANNING). Resets affected BacklogItems to AVAILABLE if needed.</summary>
+    /// <response code="204">Cycle deleted.</response>
+    /// <response code="400">Cannot delete FROZEN/COMPLETED.</response>
+    /// <response code="404">Cycle not found.</response>
     [HttpDelete("{id:guid}")]
-    public async Task<IActionResult> CancelCycle(Guid id)
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken = default)
     {
-        var cycle = await _cycles.GetByIdAsync(id);
-        if (cycle is null)
-            return NotFound(new { message = $"Cycle '{id}' not found." });
-
-        if (cycle.Status == CycleStatus.Completed)
-            return BadRequest(new { message = "Cannot cancel a completed cycle." });
-
-        if (cycle.Status == CycleStatus.Cancelled)
-            return BadRequest(new { message = "Cycle is already cancelled." });
-
-        await _cycles.DeleteAsync(id);
-
-        // Re-fetch to return updated state
-        var updated = await _cycles.GetByIdAsync(id);
-        return Ok(ToCycleResponse(updated!));
+        var error = await _service.DeleteAsync(id, cancellationToken);
+        if (error == "Cycle not found.")
+            return NotFound(new { message = error });
+        if (error != null)
+            return BadRequest(new { message = error });
+        return NoContent();
     }
 
-    // ─────────────────────────────────────────────
-    // BONUS: GET /api/cycles/history
-    // ─────────────────────────────────────────────
+    /// <summary>History: cycles with state FROZEN or COMPLETED, sorted by PlanningDate descending.</summary>
+    /// <response code="200">List with member count.</response>
     [HttpGet("history")]
-    public async Task<IActionResult> GetHistory()
+    [ProducesResponseType(typeof(IEnumerable<CycleDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetHistory(CancellationToken cancellationToken = default)
     {
-        var history = await _cycles.GetHistoryAsync();
-        return Ok(history.Select(ToCycleResponse));
+        var list = await _service.GetHistoryAsync(cancellationToken);
+        return Ok(list);
     }
-
-    // ─────────────────────────────────────────────
-    // Shared response shaping
-    // ─────────────────────────────────────────────
-    private static object ToCycleResponse(PlanningCycle c) => new
-    {
-        c.Id,
-        WeekStartDate  = c.WeekStartDate.ToString("yyyy-MM-dd"),
-        Status         = c.Status.ToString(),
-        c.CreatedAt,
-        Members = c.CycleMembers.Select(cm => new
-        {
-            cm.TeamMemberId,
-            cm.TeamMember?.Name,
-            cm.AllocatedHours
-        }),
-        CategoryBudgets = c.CategoryBudgets.Select(cb => new
-        {
-            Category    = cb.Category.ToString(),
-            cb.Percentage,
-            cb.HoursBudget
-        })
-    };
 }

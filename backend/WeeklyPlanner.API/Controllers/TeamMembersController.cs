@@ -1,166 +1,144 @@
 using Microsoft.AspNetCore.Mvc;
 using WeeklyPlanner.Core.DTOs;
-using WeeklyPlanner.Core.Entities;
-using WeeklyPlanner.Core.Interfaces;
+using WeeklyPlanner.Core.Services;
 
 namespace WeeklyPlanner.API.Controllers;
 
+/// <summary>APIs for managing team members.</summary>
 [ApiController]
 [Route("api/team-members")]
 public class TeamMembersController : ControllerBase
 {
-    private readonly ITeamMemberRepository _repository;
+    private readonly ITeamMemberService _service;
 
-    public TeamMembersController(ITeamMemberRepository repository)
+    public TeamMembersController(ITeamMemberService service)
     {
-        _repository = repository;
+        _service = service;
     }
 
-    // ─────────────────────────────────────────────
-    // 1. POST /api/team-members — Create Member
-    // ─────────────────────────────────────────────
+    /// <summary>Creates a new team member. First member ever becomes lead automatically. Request body: { name }.</summary>
+    /// <response code="201">Returns the created member.</response>
+    /// <response code="400">Validation failed or duplicate name among active members.</response>
     [HttpPost]
-    public async Task<IActionResult> CreateMember([FromBody] CreateTeamMemberDto dto)
+    [ProducesResponseType(typeof(TeamMemberDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> Create([FromBody] CreateTeamMemberRequest request, CancellationToken cancellationToken = default)
     {
         if (!ModelState.IsValid)
-            return BadRequest(ModelState);
+            return BadRequest(ValidationErrors());
 
-        var member = new TeamMember
-        {
-            Name = dto.Name.Trim(),
-            IsLead = dto.IsLead,
-            IsActive = true,
-            CreatedAt = DateTime.UtcNow
-        };
-
-        var created = await _repository.AddAsync(member);
-
-        return CreatedAtAction(nameof(GetMemberById), new { id = created.Id }, ToResponse(created));
+        var (result, error) = await _service.CreateAsync(request, cancellationToken);
+        if (error != null)
+            return BadRequest(new { message = error });
+        return CreatedAtAction(nameof(GetById), new { id = result!.Id }, result);
     }
 
-    // ─────────────────────────────────────────────
-    // 2. GET /api/team-members — Get All Active
-    // ─────────────────────────────────────────────
+    /// <summary>Gets all team members (active and inactive), sorted by CreatedAt ascending.</summary>
+    /// <response code="200">Returns the list of members.</response>
     [HttpGet]
-    public async Task<IActionResult> GetAllActiveMembers()
+    [ProducesResponseType(typeof(IEnumerable<TeamMemberDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetAll(CancellationToken cancellationToken = default)
     {
-        var members = await _repository.GetAllActiveAsync();
-        return Ok(members.Select(ToResponse));
+        var list = await _service.GetAllAsync(cancellationToken);
+        return Ok(list);
     }
 
-    // ─────────────────────────────────────────────
-    // 3. GET /api/team-members/{id} — Get By Id
-    // ─────────────────────────────────────────────
+    /// <summary>Gets a single team member by id.</summary>
+    /// <response code="200">Returns the member.</response>
+    /// <response code="404">Member not found.</response>
     [HttpGet("{id:guid}")]
-    public async Task<IActionResult> GetMemberById(Guid id)
+    [ProducesResponseType(typeof(TeamMemberDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken = default)
     {
-        var member = await _repository.GetByIdAsync(id);
+        var member = await _service.GetByIdAsync(id, cancellationToken);
         if (member is null)
-            return NotFound(new { message = $"Team member '{id}' not found." });
-
-        return Ok(ToResponse(member));
+            return NotFound(new { message = "Team member not found." });
+        return Ok(member);
     }
 
-    // ─────────────────────────────────────────────
-    // 4. PUT /api/team-members/{id} — Update Name
-    // ─────────────────────────────────────────────
+    /// <summary>Updates a team member's name. Request body: { name }.</summary>
+    /// <response code="200">Returns the updated member.</response>
+    /// <response code="400">Validation failed or another member has the same name.</response>
+    /// <response code="404">Member not found.</response>
     [HttpPut("{id:guid}")]
-    public async Task<IActionResult> UpdateMemberName(Guid id, [FromBody] UpdateTeamMemberDto dto)
+    [ProducesResponseType(typeof(TeamMemberDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateTeamMemberRequest request, CancellationToken cancellationToken = default)
     {
         if (!ModelState.IsValid)
-            return BadRequest(ModelState);
+            return BadRequest(ValidationErrors());
 
-        var member = await _repository.GetByIdAsync(id);
-        if (member is null)
-            return NotFound(new { message = $"Team member '{id}' not found." });
-
-        member.Name = dto.Name.Trim();
-        await _repository.UpdateAsync(member);
-
-        return Ok(ToResponse(member));
+        var (result, error) = await _service.UpdateAsync(id, request, cancellationToken);
+        if (error == "Team member not found.")
+            return NotFound(new { message = error });
+        if (error != null)
+            return BadRequest(new { message = error });
+        return Ok(result);
     }
 
-    // ─────────────────────────────────────────────
-    // 5. PUT /api/team-members/{id}/make-lead — Make Lead
-    // ─────────────────────────────────────────────
+    /// <summary>Makes this member the lead and sets all others to non-lead.</summary>
+    /// <response code="200">Returns the updated member.</response>
+    /// <response code="400">Member is inactive.</response>
+    /// <response code="404">Member not found.</response>
     [HttpPut("{id:guid}/make-lead")]
-    public async Task<IActionResult> MakeLead(Guid id)
+    [ProducesResponseType(typeof(TeamMemberDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> MakeLead(Guid id, CancellationToken cancellationToken = default)
     {
-        var member = await _repository.GetByIdAsync(id);
-        if (member is null)
-            return NotFound(new { message = $"Team member '{id}' not found." });
-
-        if (!member.IsActive)
-            return BadRequest(new { message = "Cannot make an inactive member the lead." });
-
-        // De-promote all other leads first
-        var allActive = await _repository.GetAllActiveAsync();
-        foreach (var m in allActive.Where(m => m.IsLead && m.Id != id))
-        {
-            m.IsLead = false;
-            await _repository.UpdateAsync(m);
-        }
-
-        member.IsLead = true;
-        await _repository.UpdateAsync(member);
-
-        return Ok(ToResponse(member));
+        var (result, error) = await _service.MakeLeadAsync(id, cancellationToken);
+        if (error == "Team member not found.")
+            return NotFound(new { message = error });
+        if (error != null)
+            return BadRequest(new { message = error });
+        return Ok(result);
     }
 
-    // ─────────────────────────────────────────────
-    // 6. PUT /api/team-members/{id}/deactivate — Deactivate
-    // ─────────────────────────────────────────────
+    /// <summary>Deactivates the member. Fails if the member is part of a cycle in SETUP, PLANNING, or FROZEN.</summary>
+    /// <response code="200">Returns the updated member.</response>
+    /// <response code="400">Member already inactive or part of an active plan.</response>
+    /// <response code="404">Member not found.</response>
     [HttpPut("{id:guid}/deactivate")]
-    public async Task<IActionResult> DeactivateMember(Guid id)
+    [ProducesResponseType(typeof(TeamMemberDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Deactivate(Guid id, CancellationToken cancellationToken = default)
     {
-        var member = await _repository.GetByIdAsync(id);
-        if (member is null)
-            return NotFound(new { message = $"Team member '{id}' not found." });
-
-        if (!member.IsActive)
-            return BadRequest(new { message = "Member is already inactive." });
-
-        // ⚠ Business rule: Cannot deactivate a member in an active cycle
-        var inActiveCycle = await _repository.IsInActiveCycleAsync(id);
-        if (inActiveCycle)
-            return BadRequest(new { message = "Cannot deactivate a member who is part of an active planning cycle." });
-
-        member.IsActive = false;
-        member.IsLead = false; // leads cannot stay lead when deactivated
-        await _repository.UpdateAsync(member);
-
-        return Ok(ToResponse(member));
+        var (result, error) = await _service.DeactivateAsync(id, cancellationToken);
+        if (error == "Team member not found.")
+            return NotFound(new { message = error });
+        if (error != null)
+            return BadRequest(new { message = error });
+        return Ok(result);
     }
 
-    // ─────────────────────────────────────────────
-    // 7. PUT /api/team-members/{id}/reactivate — Reactivate
-    // ─────────────────────────────────────────────
+    /// <summary>Reactivates an inactive member.</summary>
+    /// <response code="200">Returns the updated member.</response>
+    /// <response code="400">Member already active.</response>
+    /// <response code="404">Member not found.</response>
     [HttpPut("{id:guid}/reactivate")]
-    public async Task<IActionResult> ReactivateMember(Guid id)
+    [ProducesResponseType(typeof(TeamMemberDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Reactivate(Guid id, CancellationToken cancellationToken = default)
     {
-        var member = await _repository.GetByIdAsync(id);
-        if (member is null)
-            return NotFound(new { message = $"Team member '{id}' not found." });
-
-        if (member.IsActive)
-            return BadRequest(new { message = "Member is already active." });
-
-        member.IsActive = true;
-        await _repository.UpdateAsync(member);
-
-        return Ok(ToResponse(member));
+        var (result, error) = await _service.ReactivateAsync(id, cancellationToken);
+        if (error == "Team member not found.")
+            return NotFound(new { message = error });
+        if (error != null)
+            return BadRequest(new { message = error });
+        return Ok(result);
     }
 
-    // ─────────────────────────────────────────────
-    // Shared response shaping
-    // ─────────────────────────────────────────────
-    private static object ToResponse(TeamMember m) => new
+    private IActionResult ValidationErrors()
     {
-        m.Id,
-        m.Name,
-        m.IsLead,
-        m.IsActive,
-        m.CreatedAt
-    };
+        var errors = ModelState
+            .Where(x => x.Value?.Errors.Count > 0)
+            .ToDictionary(
+                kvp => kvp.Key,
+                kvp => kvp.Value!.Errors.Select(e => e.ErrorMessage).ToArray());
+        return BadRequest(new { errors });
+    }
 }
-
