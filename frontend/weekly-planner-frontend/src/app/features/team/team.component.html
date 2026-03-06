@@ -1,0 +1,115 @@
+<div class="page-wrapper">
+  <a routerLink="/home" class="back-link">
+    <mat-icon>arrow_back</mat-icon>
+    Home
+  </a>
+
+  <div class="page-header">
+    <h2>Manage Team</h2>
+    <p class="subtitle">Add members, assign team lead, and manage availability</p>
+  </div>
+
+  @if (isLead) {
+    <div class="wpt-card add-card">
+      <form [formGroup]="addForm" (ngSubmit)="addMember()" class="add-form">
+        <mat-form-field appearance="outline" class="name-field">
+          <mat-label>New member name</mat-label>
+          <mat-icon matPrefix>person_add</mat-icon>
+          <input matInput formControlName="name" placeholder="Type name here" maxlength="50" />
+          @if (addForm.controls.name.hasError('required') && addForm.controls.name.touched) {
+            <mat-error>Name is required</mat-error>
+          }
+          @if (addForm.controls.name.hasError('minlength')) {
+            <mat-error>Name must be at least 2 characters</mat-error>
+          }
+        </mat-form-field>
+        <button mat-flat-button class="btn-primary add-btn" type="submit" [disabled]="addForm.invalid || isAdding()">
+          @if (isAdding()) {
+            <mat-spinner diameter="18"></mat-spinner>
+          } @else {
+            <mat-icon>add</mat-icon>
+          }
+          Add Member
+        </button>
+      </form>
+    </div>
+  }
+
+  @if (isLoading()) {
+    <div class="flex-center mt-6">
+      <mat-spinner diameter="48"></mat-spinner>
+    </div>
+  }
+
+  @if (!isLoading()) {
+    <div class="wpt-card members-card">
+      <p class="section-label">Team Members ({{ activeMembers.length }})</p>
+
+      @if (activeMembers.length === 0) {
+        <div class="empty-state">
+          <mat-icon>group_off</mat-icon>
+          <p>No active members. Add the first member above.</p>
+        </div>
+      }
+
+      @if (activeMembers.length > 0) {
+        <div class="members-list">
+          @for (member of activeMembers; track member.id) {
+            <div class="item-row" [class.my-row]="member.id === currentUserId">
+              <div class="member-info">
+                <div class="avatar" [class.avatar-lead]="member.isLead">{{ getInitials(member.name) }}</div>
+                <span class="row-title">{{ member.name }}</span>
+                @if (member.id === currentUserId) {
+                  <span class="you-badge">You</span>
+                }
+                @if (member.isLead) {
+                  <span class="role-badge lead">Team Lead</span>
+                } @else {
+                  <span class="role-badge member">Member</span>
+                }
+              </div>
+              @if (isLead && member.id !== currentUserId) {
+                <div class="row-actions">
+                  @if (!member.isLead) {
+                    <button mat-button class="btn-secondary" (click)="makeLead(member)" matTooltip="Make this person the Team Lead">
+                      <mat-icon>star_outline</mat-icon>
+                      Make Lead
+                    </button>
+                  }
+                  <button mat-icon-button color="warn" (click)="deactivate(member)"
+                          [disabled]="member.isLead && hasOnlyOneLead"
+                          matTooltip="{{ member.isLead && hasOnlyOneLead ? 'Cannot remove the only lead' : 'Remove member' }}">
+                    <mat-icon>person_off</mat-icon>
+                  </button>
+                </div>
+              }
+            </div>
+          }
+        </div>
+      }
+    </div>
+
+    @if (inactiveMembers.length > 0) {
+      <div class="wpt-card members-card mt-6">
+        <p class="section-label">Removed Members ({{ inactiveMembers.length }})</p>
+        <div class="members-list">
+          @for (member of inactiveMembers; track member.id) {
+            <div class="item-row member-row-inactive">
+              <div class="member-info">
+                <div class="avatar avatar-inactive">{{ getInitials(member.name) }}</div>
+                <span class="row-title muted">{{ member.name }}</span>
+              </div>
+              <span class="role-badge inactive-badge">Removed</span>
+              @if (isLead) {
+                <button mat-button class="btn-secondary" (click)="reactivate(member)">
+                  <mat-icon>person_add</mat-icon>
+                  Reactivate
+                </button>
+              }
+            </div>
+          }
+        </div>
+      </div>
+    }
+  }
+</div>

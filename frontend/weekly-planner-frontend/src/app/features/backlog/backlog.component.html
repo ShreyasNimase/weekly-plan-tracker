@@ -1,0 +1,107 @@
+<div class="page-wrapper">
+  <a routerLink="/home" class="back-link">
+    <mat-icon>arrow_back</mat-icon>
+    Home
+  </a>
+
+  <div class="page-header header-row">
+    <div>
+      <h2>Manage Backlog</h2>
+      <p class="subtitle">All work items for your team.</p>
+    </div>
+    <div class="header-actions">
+      @if (archivedCount() > 0) {
+      <button mat-stroked-button class="btn-secondary" (click)="showArchived()" matTooltip="View archived items">
+        <mat-icon>archive</mat-icon>
+        Archives ({{ archivedCount() }})
+      </button>
+      }
+      <button mat-flat-button class="btn-primary" (click)="addNew()">
+        <mat-icon>add</mat-icon>
+        New Item
+      </button>
+    </div>
+  </div>
+
+  <div class="filter-row">
+    <div class="filter-pills">
+      @for (cat of categories; track cat) {
+      <button type="button" class="filter-pill" [class.active]="isCatActive(cat)" [ngClass]="getCatMeta(cat).cls"
+        (click)="toggleCategory(cat)">
+        {{ getCatMeta(cat).label }}
+      </button>
+      }
+    </div>
+    <mat-form-field appearance="outline" subscriptSizing="dynamic" class="filter-status">
+      <mat-label>Status</mat-label>
+      <mat-select [(ngModel)]="selectedStatus">
+        @for (opt of statusOptions; track opt.value) {
+        <mat-option [value]="opt.value">{{ opt.label }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+    <mat-form-field appearance="outline" subscriptSizing="dynamic" class="filter-search">
+      <mat-label>Search</mat-label>
+      <mat-icon matPrefix>search</mat-icon>
+      <input matInput [(ngModel)]="searchTerm" placeholder="Search by title…" />
+      @if (searchTerm) {
+      <button matSuffix mat-icon-button (click)="searchTerm = ''">
+        <mat-icon>close</mat-icon>
+      </button>
+      }
+    </mat-form-field>
+    @if (hasActiveFilters) {
+    <button mat-button (click)="clearFilters()" class="clear-filters-btn">
+      <mat-icon>filter_alt_off</mat-icon>
+      Clear Filters
+    </button>
+    }
+  </div>
+
+  @if (isLoading()) {
+  <div class="flex-center mt-6">
+    <mat-spinner diameter="48"></mat-spinner>
+  </div>
+  } @else {
+  <div class="wpt-card" style="padding: 0; overflow: hidden">
+    @if (filteredItems().length === 0) {
+    <div class="empty-backlog">
+      <mat-icon>{{ allItems().length === 0 ? 'inbox' : 'search_off' }}</mat-icon>
+      <p>
+        {{ allItems().length === 0
+        ? 'No backlog items yet. Click "New Item" to get started.'
+        : 'No items match your filters.' }}
+      </p>
+      @if (allItems().length > 0) {
+      <button mat-button (click)="clearFilters()">Clear Filters</button>
+      }
+    </div>
+    } @else {
+    @for (item of filteredItems(); track item.id) {
+    <div class="item-row">
+      <span class="cat-dot" [ngClass]="getCatMeta(item.category).cls"></span>
+      <span class="row-title">{{ item.title }}</span>
+      <span class="badge"
+        [ngClass]="getCatMeta(item.category).cls === 'cat-client' ? 'badge-client' : getCatMeta(item.category).cls === 'cat-techdebt' ? 'badge-tech' : 'badge-rd'">
+        {{ getCatMeta(item.category).label }}
+      </span>
+      <span class="row-meta">{{ item.status }}</span>
+      @if (item.estimatedHours) {
+      <span class="row-meta">{{ item.estimatedHours }}h est.</span>
+      }
+      <div class="row-actions">
+        <button mat-icon-button (click)="editItem(item)" matTooltip="Edit">
+          <mat-icon>edit</mat-icon>
+        </button>
+        @if (item.status.toUpperCase() !== 'ARCHIVED') {
+        <button mat-icon-button color="warn" (click)="archiveItem(item)" matTooltip="Archive">
+          <mat-icon>archive</mat-icon>
+        </button>
+        }
+      </div>
+    </div>
+    }
+    }
+  </div>
+  }
+</div>

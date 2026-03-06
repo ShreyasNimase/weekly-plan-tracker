@@ -1,0 +1,104 @@
+.progress-overview-card {
+  margin-bottom: 24px;
+}
+
+.progress-label {
+  margin: 0 0 10px 0;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.progress-bar-fat {
+  height: 12px;
+  margin-bottom: 8px;
+}
+
+.progress-pct-badge {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.task-row {
+  .task-left {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .task-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 4px;
+    flex-wrap: wrap;
+  }
+
+  .status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    &.badge-not-started { background: var(--stat-notstarted); }
+    &.badge-in-progress { background: var(--stat-inprogress); }
+    &.badge-completed { background: var(--stat-completed); }
+    &.badge-blocked { background: var(--stat-blocked); }
+  }
+
+  .task-progress-mini {
+    width: 80px;
+    flex-shrink: 0;
+  }
+}
+
+.empty-state-inline {
+  padding: 32px 24px;
+  text-align: center;
+  color: var(--text-muted);
+
+  mat-icon {
+    font-size: 40px;
+    width: 40px;
+    height: 40px;
+    display: block;
+    margin-bottom: 8px;
+  }
+
+  p {
+    margin: 0;
+    font-size: 0.9rem;
+  }
+}
+
+.team-overview-section {
+  .member-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 0;
+    cursor: pointer;
+  }
+
+  .member-left,
+  .member-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .expand-arrow {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+    color: var(--text-muted);
+  }
+
+  .member-tasks-list {
+    padding-left: 16px;
+    padding-bottom: 12px;
+  }
+
+  .member-task-row {
+    margin-bottom: 4px;
+  }
+}

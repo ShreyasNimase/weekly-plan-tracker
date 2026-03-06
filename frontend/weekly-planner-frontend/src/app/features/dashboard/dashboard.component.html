@@ -1,0 +1,112 @@
+<div class="page-wrapper">
+  @if (fromPast) {
+    <a routerLink="/past-cycles" class="back-link">
+      <mat-icon>arrow_back</mat-icon>
+      Past Cycles
+    </a>
+  } @else {
+    <a routerLink="/home" class="back-link">
+      <mat-icon>arrow_back</mat-icon>
+      Home
+    </a>
+  }
+
+  @if (isLoading()) {
+    <div class="flex-center" style="padding: 64px 0;"><mat-spinner diameter="48"></mat-spinner></div>
+  } @else if (!cycle()) {
+    <div class="banner danger empty-state" style="text-align: center; padding: 32px 24px">
+      <mat-icon>error_outline</mat-icon>
+      <span>Could not load dashboard.</span>
+    </div>
+  } @else {
+    <div class="page-header">
+      <div>
+        <h2>Week of {{ planDate | date:'MMM d, y' }}</h2>
+        <p class="subtitle">
+          {{ totalMembers }} team member{{ totalMembers !== 1 ? 's' : '' }} ·
+          {{ totalHours }}h total capacity ·
+          <span class="badge" [ngClass]="cycleStatusCls(cycleStatus)">{{ cycleStatus }}</span>
+        </p>
+      </div>
+    </div>
+
+    <div class="stat-cards">
+      @for (card of statCards; track card.label) {
+        <div class="stat-card" [ngClass]="card.borderCls">
+          <span class="stat-value">{{ card.value }}</span>
+          <span class="stat-label">{{ card.label }}</span>
+          @if (card.sub) {
+            <span class="stat-sub">{{ card.sub }}</span>
+          }
+          @if (card.pct !== undefined) {
+            <div class="progress-track" style="margin-top: 8px;">
+              <div class="progress-fill primary" [style.width.%]="card.pct"></div>
+            </div>
+          }
+        </div>
+      }
+    </div>
+
+    <p class="section-label">By Category</p>
+    <div class="wpt-card">
+      @for (row of catRows; track row.category) {
+        <div class="item-row clickable cat-row" (click)="navigateCat(row.category)">
+          <span class="badge" [ngClass]="row.catCls">{{ row.catLabel }}</span>
+          <div class="cat-stats">
+            <span>Budget <strong>{{ row.budgetHours }}h</strong></span>
+            <span>Done <strong>{{ row.usedHours }}h</strong> ({{ row.pct }}%)</span>
+          </div>
+          <div class="cat-bar-wrap">
+            <div class="progress-track">
+              <div class="progress-fill" [ngClass]="row.barCls" [style.width.%]="row.pct"></div>
+            </div>
+          </div>
+          <mat-icon class="drill-arrow">chevron_right</mat-icon>
+        </div>
+      }
+      @if (catRows.length === 0) {
+        <p class="text-muted" style="text-align: center; padding: 16px;">No category data.</p>
+      }
+    </div>
+
+    <p class="section-label">By Member</p>
+    <div class="wpt-card">
+      @for (m of memberRows(); track m.cycleMemberId) {
+        <div class="item-row clickable member-row" (click)="navigateMember(m)">
+          <span class="member-avatar-sm">{{ m.name.charAt(0).toUpperCase() }}</span>
+          <span class="row-title">{{ m.name }}</span>
+          <span class="member-hours-lbl">{{ m.plannedHours }}h / {{ m.allocatedHours }}h</span>
+          <span class="badge" [ngClass]="memberStatusCls(m)">{{ memberStatus(m) }}</span>
+          <mat-icon class="drill-arrow">chevron_right</mat-icon>
+        </div>
+      }
+      @if (memberRows().length === 0) {
+        <p class="text-muted" style="text-align: center; padding: 16px;">No member data.</p>
+      }
+    </div>
+
+    <div class="wpt-card">
+      <button type="button" class="collapse-header" (click)="toggleAllTasks()">
+        <span class="section-label">All Tasks This Week</span>
+        <mat-icon>{{ showAllTasks() ? 'expand_less' : 'expand_more' }}</mat-icon>
+      </button>
+      @if (showAllTasks()) {
+        @for (t of allTasks(); track t.assignmentId) {
+          <div class="item-row all-task-row">
+            <span class="row-title">{{ t.title }}</span>
+            <span class="badge" [ngClass]="catMeta(t.category).cls">{{ catMeta(t.category).label }}</span>
+            <span class="row-meta">{{ t.memberName }}</span>
+            <span class="row-meta">{{ t.plannedHours }}h planned</span>
+            @if (t.hoursCompleted !== undefined) {
+              <span class="hours-done">{{ t.hoursCompleted }}h done</span>
+            }
+            <span class="badge" [ngClass]="'badge-' + (t.progressStatus?.toLowerCase()?.replace('_', '-') ?? 'not-started')">{{ t.progressStatus ?? 'Not Started' }}</span>
+          </div>
+        }
+        @if (allTasks().length === 0) {
+          <p class="text-muted" style="text-align: center; padding: 16px;">No tasks found.</p>
+        }
+      }
+    </div>
+  }
+</div>

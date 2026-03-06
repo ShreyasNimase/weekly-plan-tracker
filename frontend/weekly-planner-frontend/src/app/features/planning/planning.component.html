@@ -1,0 +1,117 @@
+<div class="page-wrapper">
+  @if (toastMsg()) {
+  <div class="wpt-toast success">
+    <mat-icon>check_circle</mat-icon>
+    {{ toastMsg() }}
+  </div>
+  }
+
+  <a routerLink="/home" class="back-link">
+    <mat-icon>arrow_back</mat-icon>
+    Home
+  </a>
+
+  <div class="page-header">
+    <h2>Plan My Work</h2>
+  </div>
+
+  @if (isLoading()) {
+  <div class="flex-center" style="padding: 60px 0;">
+    <mat-spinner diameter="48"></mat-spinner>
+  </div>
+  } @else if (!cycle()) {
+  <div class="banner info" style="text-align: center; padding: 32px 24px">
+    <mat-icon>event_busy</mat-icon>
+    <span>No active planning cycle. Ask your Team Lead to start one.</span>
+    <a routerLink="/home" mat-stroked-button class="btn-secondary">Go to Home</a>
+  </div>
+  } @else {
+  <div class="wpt-card progress-info-card">
+    <p class="progress-label">
+      @if (myHours >= 30) {
+      <span>✓ You've planned all <strong>30h</strong>!</span>
+      @if (isReady()) {
+      <span class="ready-badge">✓ Marked as Ready</span>
+      }
+      } @else {
+      <span>{{ myHours }}h of 30 planned ({{ hoursLeft }}h remaining)</span>
+      @if (isReady()) {
+      <span class="ready-badge">✓ Marked as Ready</span>
+      }
+      }
+    </p>
+    <div class="progress-track">
+      <div class="progress-fill primary" [style.width.%]="(myHours / 30) * 100"></div>
+    </div>
+  </div>
+
+  <div class="stats-grid category-budget-cards">
+    @for (card of categoryCards(); track card.category) {
+    <div class="budget-card" [class]="card.cls">
+      <div class="budget-label">
+        <span class="cat-dot" [ngClass]="card.cls"></span>
+        {{ card.label }}
+      </div>
+      <div class="budget-numbers">
+        Budget <strong>{{ card.budgetHours }}h</strong> · Claimed <strong>{{ card.usedHours }}h</strong> · Left
+        <strong>{{ card.remaining }}h</strong>
+      </div>
+      <div class="progress-track" style="margin-top: 8px;">
+        <div class="progress-fill" [class.warning]="card.remaining <= 0" [style.width.%]="card.utilization"></div>
+      </div>
+    </div>
+    }
+  </div>
+
+  <div class="planning-actions">
+    <button mat-flat-button class="btn-primary" [disabled]="myHours >= 30" (click)="goToPick()">
+      <mat-icon>add</mat-icon>
+      Add Work from Backlog
+    </button>
+    @if (isReady()) {
+    <button mat-stroked-button class="btn-secondary" disabled>
+      <mat-icon>check_circle</mat-icon>
+      Plan Submitted ✓
+    </button>
+    } @else {
+    <button mat-stroked-button class="btn-secondary" [disabled]="!canMarkReady || isMarkingReady()"
+      (click)="openMarkReady()">
+      @if (isMarkingReady()) {
+      <mat-spinner diameter="16"></mat-spinner>
+      Submitting…
+      } @else {
+      <ng-container><mat-icon>how_to_reg</mat-icon> I'm Done Planning</ng-container>
+      }
+    </button>
+    }
+  </div>
+
+  <p class="section-label">My Plan</p>
+  <div class="wpt-card" style="padding: 0; overflow: hidden">
+    @if (assignments().length === 0) {
+    <div class="empty-plan">
+      <mat-icon>inbox</mat-icon>
+      No work picked yet. Click "Add Work from Backlog" to start.
+    </div>
+    } @else {
+    @for (a of assignments(); track a.id) {
+    <div class="item-row">
+      <span class="cat-dot" [ngClass]="categoryCls(a.backlogItemCategory)"></span>
+      <span class="row-title">{{ a.backlogItemTitle }}</span>
+      <span class="badge"
+        [ngClass]="(categoryCls(a.backlogItemCategory) === 'cat-client' || categoryCls(a.backlogItemCategory) === 'cat-feature') ? 'badge-client' : categoryCls(a.backlogItemCategory) === 'cat-techdebt' ? 'badge-tech' : 'badge-rd'">
+        {{ categoryLabel(a.backlogItemCategory) }}
+      </span>
+      <span class="hours-chip">{{ a.plannedHours }}h</span>
+      <div class="row-actions">
+        <button mat-button class="btn-secondary" (click)="openChangeHours(a)">Change Hours</button>
+        <button mat-icon-button color="warn" (click)="removeAssignment(a)">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+    </div>
+    }
+    }
+  </div>
+  }
+</div>

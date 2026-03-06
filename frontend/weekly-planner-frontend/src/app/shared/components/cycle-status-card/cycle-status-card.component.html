@@ -1,0 +1,94 @@
+<div class="cycle-status-card" [ngClass]="'state-' + cycle.state.toLowerCase()">
+
+    <!-- Header row -->
+    <div class="cs-header">
+        <div class="cs-left">
+            <mat-icon class="cs-icon">{{ stateIcon }}</mat-icon>
+            <div>
+                <div class="cs-title">
+                    Active Week
+                    <ng-container *ngIf="displayDate"> — {{ displayDate | date:'dd MMM yyyy' }}</ng-container>
+                </div>
+                <div class="cs-subtitle">
+                    {{ memberCount }} member{{ memberCount !== 1 ? 's' : '' }}
+                    <ng-container *ngIf="cycle.teamCapacity"> · {{ cycle.teamCapacity }}h total capacity</ng-container>
+                </div>
+            </div>
+        </div>
+        <div class="cs-right">
+            <span class="state-chip" [ngClass]="cycle.state">{{ stateLabel }}</span>
+        </div>
+    </div>
+
+    <!-- Work period -->
+    <div class="cs-period" *ngIf="cycle.executionStartDate">
+        <mat-icon>date_range</mat-icon>
+        <span>
+            Work period:
+            <strong>{{ cycle.executionStartDate | date:'dd MMM' }}</strong>
+            to
+            <strong>{{ cycle.executionEndDate | date:'dd MMM yyyy' }}</strong>
+        </span>
+    </div>
+
+    <!-- Category budgets — PLANNING state -->
+    <div class="cs-budgets" *ngIf="cycle.state === 'PLANNING' && (cycle.categoryAllocations?.length ?? 0) > 0">
+        <div class="cs-budget-item" *ngFor="let alloc of cycle.categoryAllocations">
+            <span class="cat-badge" [ngClass]="alloc.category">{{ catLabel(alloc.category) }}</span>
+            <span class="cs-budget-hours">{{ alloc.budgetHours }}h</span>
+        </div>
+    </div>
+
+    <!-- Progress bar — FROZEN state -->
+    <div class="cs-progress-section" *ngIf="cycle.state === 'FROZEN'">
+        <div class="cs-progress-label">
+            <span>Team Progress</span>
+            <span>{{ completedHours }}h / {{ cycle.teamCapacity ?? 0 }}h</span>
+        </div>
+        <div class="progress-track">
+            <div class="progress-fill" [style.width.%]="progressPct"></div>
+        </div>
+    </div>
+
+    <!-- Lead actions -->
+    <div class="cs-actions" *ngIf="isLead">
+
+        <!-- SETUP state -->
+        <ng-container *ngIf="cycle.state === 'SETUP'">
+            <button mat-flat-button class="btn-primary cs-btn" (click)="onSetupClick()">
+                <mat-icon>settings</mat-icon>
+                Configure This Week
+            </button>
+            <button class="cs-btn-danger" (click)="onCancelSetupClick()">
+                <mat-icon>delete_outline</mat-icon>
+                Cancel Setup
+            </button>
+        </ng-container>
+
+        <!-- PLANNING state -->
+        <ng-container *ngIf="cycle.state === 'PLANNING'">
+            <button mat-flat-button class="btn-primary cs-btn" (click)="onFreezeReviewClick()">
+                <mat-icon>ac_unit</mat-icon>
+                Review &amp; Freeze Plan
+            </button>
+            <button class="cs-btn-danger" (click)="onCancelPlanningClick()">
+                <mat-icon>cancel</mat-icon>
+                Cancel Planning
+            </button>
+        </ng-container>
+
+        <!-- FROZEN state -->
+        <ng-container *ngIf="cycle.state === 'FROZEN'">
+            <button mat-flat-button class="btn-primary cs-btn" (click)="onDashboardClick()">
+                <mat-icon>bar_chart</mat-icon>
+                View Team Progress
+            </button>
+            <button class="cs-btn-success" (click)="onFinishWeekClick()">
+                <mat-icon>task_alt</mat-icon>
+                Finish This Week
+            </button>
+        </ng-container>
+
+    </div>
+
+</div>

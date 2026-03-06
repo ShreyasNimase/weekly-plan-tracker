@@ -1,0 +1,128 @@
+.home-greeting {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 28px;
+  padding: 20px 24px;
+  background: var(--bg-surface);
+  border-radius: 14px;
+  border: 1px solid var(--border);
+}
+
+.greeting-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, var(--primary), var(--info));
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.home-greeting h1 {
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin: 0 0 4px;
+  color: var(--text-primary);
+}
+
+.home-greeting p {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.action-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--primary-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+
+  mat-icon {
+    color: var(--primary);
+    font-size: 22px;
+    width: 22px;
+    height: 22px;
+  }
+}
+
+.action-icon.danger {
+  background: var(--danger-light);
+
+  mat-icon {
+    color: var(--danger);
+  }
+}
+
+/* New icon variants used by the rewritten template */
+.action-icon.primary {
+  background: var(--primary);
+
+  mat-icon {
+    color: #fff;
+  }
+}
+
+.action-icon.success {
+  background: var(--success-light, rgba(22, 163, 74, 0.1));
+
+  mat-icon {
+    color: var(--success, #16a34a);
+  }
+}
+
+.action-icon.muted {
+  background: var(--bg-surface-2);
+
+  mat-icon {
+    color: var(--text-muted);
+  }
+}
+
+/* Primary-highlighted action card */
+.action-card.primary-card {
+  border-color: var(--primary);
+  background: var(--primary-light, rgba(79, 70, 229, 0.06));
+
+  .card-title {
+    color: var(--primary);
+  }
+}
+
+/* Greeting badges row */
+.greeting-badges {
+  display: flex;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.cycle-status-bar.cycle-planning {
+  border-left-color: var(--primary);
+}
+
+.cycle-status-bar.cycle-frozen {
+  border-left-color: var(--info);
+}
+
+.cycle-status-bar.cycle-setup {
+  border-left-color: var(--warning);
+}
+
+.cycle-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: rgba(0, 0, 0, 0.08);
+  color: var(--text-primary);
+}
