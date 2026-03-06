@@ -1,0 +1,144 @@
+// Shared reusable styles for drill-down sub-pages (category-drill + member-drill)
+.back-link:hover {
+    color: var(--primary);
+}
+
+.member-drill-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.member-avatar-lg {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary), var(--info));
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    flex-shrink: 0;
+}
+
+.task-note {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin: 4px 0 0;
+    font-style: italic;
+    width: 100%;
+}
+
+.page-header {
+    margin-bottom: 16px;
+
+    h1 {
+        font-size: 1.5rem;
+        font-weight: 800;
+        margin: 0 0 4px;
+    }
+
+    .subtitle {
+        font-size: .9rem;
+        color: var(--text-secondary);
+        margin: 0;
+
+        strong {
+            color: var(--text-primary);
+        }
+    }
+}
+
+.cat-bar-track {
+    height: 10px;
+    background: rgba(0, 0, 0, .08);
+    border-radius: 6px;
+    overflow: hidden;
+
+    &.large {
+        height: 14px;
+        margin-bottom: 6px;
+    }
+}
+
+.cat-bar-fill {
+    height: 100%;
+    border-radius: 6px;
+    transition: width .4s ease;
+
+    &.bar-green {
+        background: #22c55e;
+    }
+
+    &.bar-blue {
+        background: #3b82f6;
+    }
+
+    &.bar-orange {
+        background: #f97316;
+    }
+}
+
+.pct-label {
+    font-size: .85rem;
+    color: var(--text-secondary);
+    margin: 0 0 18px;
+}
+
+.task-list {
+    background: var(--surface-card);
+    border-radius: 16px;
+    box-shadow: var(--shadow-card);
+    overflow: hidden;
+    margin-top: 8px;
+}
+
+.task-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 13px 20px;
+    flex-wrap: wrap;
+    font-size: .87rem;
+    transition: background .15s;
+
+    &:hover {
+        background: rgba(0, 0, 0, .02);
+    }
+}
+
+.task-title {
+    font-weight: 700;
+    flex: 2;
+    min-width: 100px;
+}
+
+.member-lbl {
+    font-size: .8rem;
+    color: var(--text-secondary);
+    flex: 1;
+}
+
+.hours-lbl {
+    font-size: .8rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.hours-done {
+    font-size: .8rem;
+    color: #22c55e;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.muted-center {
+    text-align: center;
+    padding: 20px;
+    font-size: .85rem;
+    color: var(--text-secondary);
+}
