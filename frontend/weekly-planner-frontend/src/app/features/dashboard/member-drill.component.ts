@@ -1,6 +1,6 @@
 import { Component, inject, signal, OnInit } from '@angular/core';
 import { RouterLink, ActivatedRoute } from '@angular/router';
-import { DatePipe, NgClass } from '@angular/common';
+import { NgClass } from '@angular/common';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
@@ -11,11 +11,11 @@ import { MemberProgress } from '../../shared/models/progress.model';
 import { catchError, of } from 'rxjs';
 
 @Component({
-    selector: 'app-member-drill',
-    standalone: true,
-    imports: [RouterLink, DatePipe, NgClass, MatButtonModule, MatIconModule,
-        MatProgressSpinnerModule, MatDividerModule, MatSnackBarModule],
-    template: `
+  selector: 'app-member-drill',
+  standalone: true,
+  imports: [RouterLink, NgClass, MatButtonModule, MatIconModule,
+    MatProgressSpinnerModule, MatDividerModule, MatSnackBarModule],
+  template: `
 <div class="page-wrapper">
   <a [routerLink]="['/dashboard', cycleId]" class="back-link"><mat-icon>arrow_back</mat-icon> Dashboard</a>
 
@@ -64,66 +64,74 @@ import { catchError, of } from 'rxjs';
     </div>
   }
 </div>`,
-    styleUrl: './category-drill.component.scss',
+  styleUrl: './category-drill.component.scss',
 })
 export class MemberDrillComponent implements OnInit {
-    private readonly progressService = inject(ProgressService);
-    private readonly route = inject(ActivatedRoute);
-    private readonly snackBar = inject(MatSnackBar);
+  private readonly progressService = inject(ProgressService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly snackBar = inject(MatSnackBar);
 
-    readonly isLoading = signal(true);
-    readonly mp = signal<MemberProgress | null>(null);
+  readonly isLoading = signal(true);
+  readonly mp = signal<MemberProgress | null>(null);
 
-    get cycleId(): string { return this.route.snapshot.paramMap.get('cycleId') ?? ''; }
-    get memberId(): string { return this.route.snapshot.paramMap.get('memberId') ?? ''; }
+  get cycleId(): string { return this.route.snapshot.paramMap.get('cycleId') ?? ''; }
+  get memberId(): string { return this.route.snapshot.paramMap.get('memberId') ?? ''; }
 
-    get completedHours(): number {
-        return (this.mp()?.tasks ?? []).reduce((s, t) => s + this.getHoursCompletedNum(t), 0);
-    }
-    get progressPct(): number {
-        const planned = this.mp()?.plannedHours ?? 0;
-        return planned ? Math.min(100, Math.round((this.completedHours / planned) * 100)) : 0;
-    }
-    get barCls(): string {
-        return this.progressPct >= 100 ? 'bar-green' : this.progressPct >= 50 ? 'bar-blue' : 'bar-orange';
-    }
-    get overallStatusLabel(): string {
-        const tasks: any[] = this.mp()?.tasks ?? [];
-        if (this.mp()?.isReady) return 'All Done';
-        if (tasks.some((t) => t['progressStatus'] === 'BLOCKED')) return 'Has Blockers';
-        if (tasks.some((t) => t['progressStatus'] === 'IN_PROGRESS')) return 'In Progress';
-        return 'Not Started';
-    }
-    get overallStatusCls(): string {
-        const lbl = this.overallStatusLabel;
-        if (lbl === 'All Done') return 'badge-completed';
-        if (lbl === 'Has Blockers') return 'badge-blocked';
-        if (lbl === 'In Progress') return 'badge-in-progress';
-        return 'badge-not-started';
-    }
+  get completedHours(): number {
+    return (this.mp()?.tasks ?? []).reduce((s, t) => s + this.getHoursCompletedNum(t), 0);
+  }
+  get progressPct(): number {
+    const planned = this.mp()?.plannedHours ?? 0;
+    return planned ? Math.min(100, Math.round((this.completedHours / planned) * 100)) : 0;
+  }
+  get barCls(): string {
+    return this.progressPct >= 100 ? 'bar-green' : this.progressPct >= 50 ? 'bar-blue' : 'bar-orange';
+  }
+  get overallStatusLabel(): string {
+    const tasks: any[] = this.mp()?.tasks ?? [];
+    if (this.mp()?.isReady) return 'All Done';
+    if (tasks.some((t) => t['progressStatus'] === 'BLOCKED')) return 'Has Blockers';
+    if (tasks.some((t) => t['progressStatus'] === 'IN_PROGRESS')) return 'In Progress';
+    return 'Not Started';
+  }
+  get overallStatusCls(): string {
+    const lbl = this.overallStatusLabel;
+    if (lbl === 'All Done') return 'badge-completed';
+    if (lbl === 'Has Blockers') return 'badge-blocked';
+    if (lbl === 'In Progress') return 'badge-in-progress';
+    return 'badge-not-started';
+  }
 
-    getHoursCompleted(t: any): number | null { const v = t['hoursCompleted']; return v !== undefined ? +v : null; }
-    getHoursCompletedNum(t: any): number { return +(t['hoursCompleted'] ?? 0); }
-    getProgressStatus(t: any): string { return t['progressStatus'] ?? 'NOT_STARTED'; }
-    getNotes(t: any): string { return t['notes'] ?? ''; }
+  getHoursCompleted(t: any): number | null { const v = t['hoursCompleted']; return v !== undefined ? +v : null; }
+  getHoursCompletedNum(t: any): number { return +(t['hoursCompleted'] ?? 0); }
+  getProgressStatus(t: any): string { return t['progressStatus'] ?? 'NOT_STARTED'; }
+  getNotes(t: any): string { return t['notes'] ?? ''; }
 
-    catCls(cat: string): string {
-        return ({ Feature: 'cat-feature', Bug: 'cat-bug', TechDebt: 'cat-techdebt', Learning: 'cat-learning', Other: 'cat-other' } as Record<string, string>)[cat] ?? 'cat-other';
-    }
-    catLabel(cat: string): string {
-        return ({ Feature: 'Feature', Bug: 'Bug', TechDebt: 'Tech Debt', Learning: 'Learning', Other: 'Other' } as Record<string, string>)[cat] ?? cat;
-    }
-    statusCls(s: string): string {
-        return ({ NOT_STARTED: 'badge-not-started', IN_PROGRESS: 'badge-in-progress', COMPLETED: 'badge-completed', BLOCKED: 'badge-blocked' } as Record<string, string>)[s] ?? 'badge-not-started';
-    }
-    statusLabel(s: string): string {
-        return ({ NOT_STARTED: 'Not Started', IN_PROGRESS: 'In Progress', COMPLETED: 'Completed', BLOCKED: 'Blocked' } as Record<string, string>)[s] ?? s;
-    }
+  catCls(cat: string): string {
+    const m: Record<string, string> = {
+      CLIENT_FOCUSED: 'cat-client', TECH_DEBT: 'cat-techdebt', R_AND_D: 'cat-rnd',
+      Feature: 'cat-client', TechDebt: 'cat-techdebt', Learning: 'cat-rnd',
+    };
+    return m[cat] ?? 'cat-other';
+  }
+  catLabel(cat: string): string {
+    const m: Record<string, string> = {
+      CLIENT_FOCUSED: 'Client Focused', TECH_DEBT: 'Tech Debt', R_AND_D: 'R\u0026D',
+      Feature: 'Client Focused', TechDebt: 'Tech Debt', Learning: 'R\u0026D',
+    };
+    return m[cat] ?? cat;
+  }
+  statusCls(s: string): string {
+    return ({ NOT_STARTED: 'badge-not-started', IN_PROGRESS: 'badge-in-progress', COMPLETED: 'badge-completed', BLOCKED: 'badge-blocked' } as Record<string, string>)[s] ?? 'badge-not-started';
+  }
+  statusLabel(s: string): string {
+    return ({ NOT_STARTED: 'Not Started', IN_PROGRESS: 'In Progress', COMPLETED: 'Completed', BLOCKED: 'Blocked' } as Record<string, string>)[s] ?? s;
+  }
 
-    ngOnInit(): void {
-        this.progressService.getMemberProgress(this.cycleId, this.memberId).pipe(catchError(() => of(null))).subscribe({
-            next: (mp: MemberProgress | null) => { this.mp.set(mp); this.isLoading.set(false); },
-            error: () => { this.isLoading.set(false); this.snackBar.open('Failed to load member detail.', 'Dismiss', { duration: 5000 }); },
-        });
-    }
+  ngOnInit(): void {
+    this.progressService.getMemberProgress(this.cycleId, this.memberId).pipe(catchError(() => of(null))).subscribe({
+      next: (mp: MemberProgress | null) => { this.mp.set(mp); this.isLoading.set(false); },
+      error: () => { this.isLoading.set(false); this.snackBar.open('Failed to load member detail.', 'Dismiss', { duration: 5000 }); },
+    });
+  }
 }
