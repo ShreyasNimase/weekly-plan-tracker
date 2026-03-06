@@ -1,0 +1,130 @@
+<div class="page-wrapper">
+  @if (toastMsg()) {
+    <div class="wpt-toast success">
+      <mat-icon>check_circle</mat-icon>
+      {{ toastMsg() }}
+    </div>
+  }
+
+  <a routerLink="/home" class="back-link">
+    <mat-icon>arrow_back</mat-icon>
+    Home
+  </a>
+
+  @if (isLoading()) {
+    <div class="flex-center" style="padding: 64px 0;"><mat-spinner diameter="48"></mat-spinner></div>
+  } @else if (!cycle()) {
+    <div class="banner info empty-state" style="text-align: center; padding: 32px 24px">
+      <mat-icon>event_busy</mat-icon>
+      <span>No frozen cycle found. Progress tracking is available when the plan is frozen.</span>
+    </div>
+  } @else {
+    <div class="page-header">
+      <h2>Update My Progress</h2>
+      <p class="subtitle">Week of <strong>{{ planningDate | date:'MMM d, y' }}</strong>. Keep your tasks up to date.</p>
+    </div>
+
+    <div class="wpt-card progress-overview-card">
+      <p class="progress-label">
+        Your hours: <strong>{{ myCompletedHours }}h</strong> completed of <strong>{{ myPlannedHours }}h</strong> planned.
+      </p>
+      <div class="progress-track progress-bar-fat">
+        <div class="progress-fill primary" [class.ok]="myProgressPct >= 100" [style.width.%]="myProgressPct"></div>
+      </div>
+      <span class="progress-pct-badge">{{ myProgressPct | number:'1.0-0' }}%</span>
+    </div>
+
+    <p class="section-label">My Tasks</p>
+    <div class="wpt-card" style="padding: 0; overflow: hidden">
+      @if (sortedMyTasks.length === 0) {
+        <div class="empty-state-inline">
+          <mat-icon>inbox</mat-icon>
+          <p>You have no tasks assigned this week.</p>
+        </div>
+      }
+      @for (task of sortedMyTasks; track task.assignmentId; let last = $last) {
+        <div class="item-row task-row" [class.overage]="task.hoursCompleted > task.plannedHours">
+          <span class="status-dot" [ngClass]="statusCls(taskStatus(task))"></span>
+          <div class="task-left">
+            <span class="row-title">{{ task.title }}</span>
+            <div class="task-meta">
+              <span class="badge" [ngClass]="catCls(task.category) === 'cat-client' || catCls(task.category) === 'cat-feature' ? 'badge-client' : catCls(task.category) === 'cat-techdebt' ? 'badge-tech' : 'badge-rd'">{{ catLabel(task.category) }}</span>
+              <span class="badge" [ngClass]="statusCls(taskStatus(task))">{{ statusLabel(taskStatus(task)) }}</span>
+              <span class="row-meta">{{ task.hoursCompleted }}h / {{ task.plannedHours }}h</span>
+            </div>
+          </div>
+          <div class="task-progress-mini">
+            <div class="progress-track">
+              <div class="progress-fill" [class.ok]="task.hoursCompleted >= task.plannedHours" [style.width.%]="task.plannedHours > 0 ? (task.hoursCompleted / task.plannedHours) * 100 : 0"></div>
+            </div>
+          </div>
+          <button mat-button class="btn-secondary update-btn" (click)="openUpdate(task)">
+            <mat-icon>edit</mat-icon>
+            Update
+          </button>
+        </div>
+        @if (!last) {
+          <mat-divider></mat-divider>
+        }
+      }
+    </div>
+
+    @if (isLead) {
+      <div class="team-overview-section wpt-card" style="margin-top: 24px">
+        <mat-expansion-panel>
+          <mat-expansion-panel-header>
+            <mat-panel-title><mat-icon>groups</mat-icon> Team Overview</mat-panel-title>
+          </mat-expansion-panel-header>
+          @for (m of teamMembers(); track m.cycleMemberId) {
+            <div class="member-item" (click)="toggleMemberDetail(m)">
+              <div class="member-summary">
+                <div class="member-left">
+                  <span class="member-name">{{ m.name }}</span>
+                  @if (isCurrentUser(m)) {
+                    <span class="you-badge">You</span>
+                  }
+                </div>
+                <div class="member-right">
+                  <span class="member-hours">{{ m.plannedHours }}h / 30h</span>
+                  @if (memberBlockedCount(m) > 0) {
+                    <span class="badge badge-blocked">Blocked</span>
+                  } @else if (m.plannedHours >= 30) {
+                    <span class="badge badge-completed">All Done</span>
+                  } @else {
+                    <span class="member-fraction">{{ memberCompletedCount(m) }}/{{ m.taskCount }} tasks done</span>
+                  }
+                  <mat-icon class="expand-arrow">{{ isMemberExpanded(m) ? 'expand_less' : 'expand_more' }}</mat-icon>
+                </div>
+              </div>
+              @if (isMemberExpanded(m)) {
+                <div class="member-tasks-list" (click)="$event.stopPropagation()">
+                  @if (isLoadingMember(m)) {
+                    <mat-spinner diameter="28" style="margin: 12px auto;"></mat-spinner>
+                  }
+                  @for (t of memberTasks(m); track t.assignmentId; let last = $last) {
+                    <div class="member-task-row item-row">
+                      <span class="row-title">{{ t.title }}</span>
+                      <span class="badge" [ngClass]="catCls(t.category) === 'cat-client' || catCls(t.category) === 'cat-feature' ? 'badge-client' : catCls(t.category) === 'cat-techdebt' ? 'badge-tech' : 'badge-rd'">{{ catLabel(t.category) }}</span>
+                      <span class="row-meta">{{ t.plannedHours }}h</span>
+                      @if (t['hoursCompleted'] !== undefined) {
+                        <span class="hours-done">{{ t['hoursCompleted'] }}h done</span>
+                      }
+                      <span class="badge" [ngClass]="statusCls(t['progressStatus'] ?? 'NOT_STARTED')">{{ statusLabel(t['progressStatus'] ?? 'NOT_STARTED') }}</span>
+                    </div>
+                    @if (!last) {
+                      <mat-divider></mat-divider>
+                    }
+                  }
+                  @if (memberTasks(m).length === 0 && !isLoadingMember(m)) {
+                    <p class="text-muted" style="text-align: center; padding: 12px;">No tasks.</p>
+                  }
+                </div>
+              }
+            </div>
+            <mat-divider></mat-divider>
+          }
+        </mat-expansion-panel>
+      </div>
+    }
+  }
+</div>
