@@ -122,7 +122,7 @@ const CAT_META: Record<string, { label: string; cls: string }> = {
             [disabled]="form.invalid || exceeds30() || isSaving()"
             (click)="confirm()">
       @if (isSaving()) { <mat-spinner diameter="16"></mat-spinner> Saving… }
-      @else { <mat-icon>{{ isEdit ? 'save' : 'add_task' }}</mat-icon> {{ isEdit ? 'Save Changes' : 'Add to My Plan' }} }
+      @else { <ng-container><mat-icon>{{ isEdit ? 'save' : 'add_task' }}</mat-icon> {{ isEdit ? 'Save Changes' : 'Add to My Plan' }}</ng-container> }
     </button>
   </mat-dialog-actions>
 </div>
