@@ -12,10 +12,10 @@ import { ProgressService } from '../../core/services/progress.service';
 import { AuthService } from '../../core/services/auth.service';
 import { BacklogService } from '../../core/services/backlog.service';
 import { BacklogItem } from '../../shared/models/backlog-item.model';
-import { CycleMemberDetail, CategoryProgress, MemberProgress } from '../../shared/models/progress.model';
+import { CategoryProgress } from '../../shared/models/progress.model';
 import { HourCommitModalComponent, HourCommitResult } from '../../shared/components/hour-commit-modal.component';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { forkJoin, of, switchMap, catchError } from 'rxjs';
+import { forkJoin, of, catchError } from 'rxjs';
 
 interface BudgetPill {
     category: string;
@@ -25,11 +25,13 @@ interface BudgetPill {
 }
 
 const CAT_META: Record<string, { label: string; cls: string }> = {
-    Feature: { label: 'Feature', cls: 'cat-feature' },
-    Bug: { label: 'Bug', cls: 'cat-bug' },
+    CLIENT_FOCUSED: { label: 'Client Focused', cls: 'cat-client' },
+    TECH_DEBT: { label: 'Tech Debt', cls: 'cat-techdebt' },
+    R_AND_D: { label: 'R\u0026D', cls: 'cat-rnd' },
+    // legacy fallbacks
+    Feature: { label: 'Client Focused', cls: 'cat-client' },
     TechDebt: { label: 'Tech Debt', cls: 'cat-techdebt' },
-    Learning: { label: 'Learning', cls: 'cat-learning' },
-    Other: { label: 'Other', cls: 'cat-other' },
+    Learning: { label: 'R\u0026D', cls: 'cat-rnd' },
 };
 
 @Component({
@@ -66,7 +68,7 @@ export class PlanningPickComponent implements OnInit {
     readonly toastMsg = signal<string | null>(null);
     readonly addingId = signal<string | null>(null);
 
-    private cycleMember: CycleMemberDetail | null = null;
+    private memberPlanId: string | null = null;
     private cycleId = '';
     private myItemIds = new Set<string>();
     private toastTimer: ReturnType<typeof setTimeout> | null = null;
@@ -80,22 +82,33 @@ export class PlanningPickComponent implements OnInit {
     load(): void {
         this.isLoading.set(true);
         const user = this.currentUser();
+        const cycle = this.cycleService.activeCycle;
 
-        this.cycleService.loadActive().pipe(
-            switchMap((cycle) => {
-                if (!cycle || !user) return of(null);
-                this.cycleId = cycle.id;
+        if (!cycle || !user) {
+            this.isLoading.set(false);
+            return;
+        }
 
-                return forkJoin([
-                    this.progressService.getCycleDetail(cycle.id).pipe(catchError(() => of(null))),
-                    this.progressService.getCategoryProgress(cycle.id).pipe(catchError(() => of([]))),
-                    this.backlogService.getAll({}).pipe(catchError(() => of([]))),
-                ] as const);
-            }),
-            switchMap((result) => {
-                if (!result) { this.isLoading.set(false); return of(null); }
-                const [detail, catProgress, items] = result;
+        this.cycleId = cycle.id;
 
+        // ── Find this user's MemberPlan from the cached cycle ──────────────────
+        // GET /api/cycles/{id} doesn't exist — use memberPlans embedded in activeCycle
+        const memberPlan = cycle.memberPlans?.find(mp => mp.memberId === user.id);
+        this.memberPlanId = memberPlan?.id ?? null;
+
+        if (memberPlan) {
+            this.myHoursLeft.set(30 - (memberPlan.totalPlannedHours ?? 0));
+        }
+
+        forkJoin([
+            this.progressService.getCategoryProgress(cycle.id).pipe(catchError(() => of([]))),
+            this.backlogService.getAll({}).pipe(catchError(() => of([]))),
+            this.memberPlanId
+                // Backend route: GET /api/cycles/{id}/members/{memberId}/progress (memberId = TeamMember.Id)
+                ? this.progressService.getMemberProgress(cycle.id, user.id).pipe(catchError(() => of(null)))
+                : of(null),
+        ] as const).subscribe({
+            next: ([catProgress, items, mp]) => {
                 // Category budget pills
                 const pills: BudgetPill[] = (catProgress as CategoryProgress[]).map((cp) => {
                     const meta = CAT_META[cp.category] ?? { label: cp.category, cls: 'cat-other' };
@@ -103,46 +116,17 @@ export class PlanningPickComponent implements OnInit {
                 });
                 this.budgetPills.set(pills);
 
-                // Store all backlog items (will use as context for modal)
-                const allItems = (items as BacklogItem[]).filter(
-                    (i) => i.status === 'Active' || i.status === 'Available'
-                );
+                // Available items from backlog (AVAILABLE = not yet in any plan)
+                const allAvailable = (items as BacklogItem[]).filter(i => i.status === 'AVAILABLE');
 
-                const user = this.currentUser();
-                if (!detail || !user) {
-                    this.availableItems.set(allItems);
-                    this.isLoading.set(false);
-                    return of(null);
+                if ((mp as any)?.tasks) {
+                    this.myItemIds = new Set((mp as any).tasks.map((t: any) => t.backlogItemId));
+                    this.myHoursLeft.set((mp as any).remainingHours ?? this.myHoursLeft());
                 }
 
-                // Find this user's CycleMember
-                const cm = (detail as any).members?.find(
-                    (m: CycleMemberDetail) => m.teamMemberId === user.id
-                ) ?? null;
-                this.cycleMember = cm;
-
-                if (!cm) {
-                    this.availableItems.set(allItems);
-                    this.isLoading.set(false);
-                    return of(null);
-                }
-
-                // Load member's plan to exclude already-picked items and get hoursLeft
-                return this.progressService.getMemberProgress(this.cycleId, cm.id).pipe(
-                    catchError(() => of(null)),
-                    switchMap((mp: MemberProgress | null) => {
-                        if (mp?.tasks) {
-                            this.myItemIds = new Set(mp.tasks.map((t) => t.backlogItemId));
-                            this.myHoursLeft.set(mp.remainingHours);
-                        }
-                        // Filter out items already in plan
-                        this.availableItems.set(allItems.filter((i) => !this.myItemIds.has(i.id)));
-                        this.isLoading.set(false);
-                        return of(null);
-                    })
-                );
-            })
-        ).subscribe({
+                this.availableItems.set(allAvailable.filter(i => !this.myItemIds.has(i.id)));
+                this.isLoading.set(false);
+            },
             error: () => {
                 this.isLoading.set(false);
                 this.snackBar.open('Failed to load backlog.', 'Dismiss', { duration: 5000 });
@@ -151,8 +135,11 @@ export class PlanningPickComponent implements OnInit {
     }
 
     pickItem(item: BacklogItem): void {
-        const cm = this.cycleMember;
-        if (!cm) return;
+        const memberPlanId = this.memberPlanId;
+        if (!memberPlanId) {
+            this.snackBar.open('You are not a member of this cycle.', 'Dismiss', { duration: 4000 });
+            return;
+        }
 
         const catPill = this.budgetPills().find((p) => p.category === item.category);
 
@@ -160,7 +147,7 @@ export class PlanningPickComponent implements OnInit {
             width: '460px',
             data: {
                 item,
-                cycleMemberId: cm.id,
+                cycleMemberId: memberPlanId,   // MemberPlan.Id
                 myHoursLeft: this.myHoursLeft(),
                 categoryBudgetLeft: catPill?.remaining ?? 30,
             },
@@ -168,13 +155,9 @@ export class PlanningPickComponent implements OnInit {
             if (!res) return;
             if ('error' in res) { this.snackBar.open(res.error, 'Close', { duration: 5000 }); return; }
 
-            // Update local state
             this.myHoursLeft.update((h) => h - res.hours);
             this.availableItems.update((list) => list.filter((i) => i.id !== item.id));
-
             this.showToast(`Added: ${item.title}`);
-
-            // Navigate back after brief delay so toast is visible
             setTimeout(() => this.router.navigate(['/planning']), 1200);
         });
     }
