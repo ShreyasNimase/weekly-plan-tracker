@@ -1,5 +1,4 @@
 using System.ComponentModel.DataAnnotations;
-using WeeklyPlanner.Core.Enums;
 
 namespace WeeklyPlanner.Core.DTOs;
 
@@ -9,13 +8,16 @@ public class CreateBacklogItemDto
     [MaxLength(200, ErrorMessage = "Title cannot exceed 200 characters.")]
     public string Title { get; set; } = string.Empty;
 
-    [MaxLength(2000, ErrorMessage = "Description cannot exceed 2000 characters.")]
+    [MaxLength(5000, ErrorMessage = "Description cannot exceed 5000 characters.")]
     public string? Description { get; set; }
 
-    public BacklogCategory Category { get; set; } = BacklogCategory.Feature;
+    /// <summary>CLIENT_FOCUSED, TECH_DEBT, or R_AND_D.</summary>
+    [Required]
+    public string Category { get; set; } = "CLIENT_FOCUSED";
 
-    public BacklogPriority Priority { get; set; } = BacklogPriority.Medium;
+    [Range(0.5, 999.5, ErrorMessage = "Estimated effort must be between 0.5 and 999.5 (0.5 steps).")]
+    public decimal? EstimatedEffort { get; set; }
 
-    [Range(0.5, 200, ErrorMessage = "Estimated hours must be between 0.5 and 200.")]
-    public decimal? EstimatedHours { get; set; }
+    [Required]
+    public Guid CreatedBy { get; set; }
 }
