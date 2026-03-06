@@ -20,7 +20,7 @@ import { BacklogItem } from '../../shared/models/backlog-item.model';
 import { HourCommitModalComponent, HourCommitResult } from '../../shared/components/hour-commit-modal.component';
 import { ConfirmDialogComponent } from '../../shared/dialogs/confirm-dialog.component';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { forkJoin, of, switchMap, catchError } from 'rxjs';
+import { forkJoin, of, catchError } from 'rxjs';
 
 interface CategoryCard {
   category: string;
@@ -33,11 +33,15 @@ interface CategoryCard {
 }
 
 const CAT_META: Record<string, { label: string; cls: string }> = {
-  Feature: { label: 'Feature', cls: 'cat-feature' },
-  Bug: { label: 'Bug', cls: 'cat-bug' },
+  CLIENT_FOCUSED: { label: 'Client Focused', cls: 'cat-client' },
+  TECH_DEBT: { label: 'Tech Debt', cls: 'cat-techdebt' },
+  R_AND_D: { label: 'R\u0026D', cls: 'cat-rnd' },
+  // legacy fallbacks
+  Feature: { label: 'Client Focused', cls: 'cat-client' },
   TechDebt: { label: 'Tech Debt', cls: 'cat-techdebt' },
-  Learning: { label: 'Learning', cls: 'cat-learning' },
-  Other: { label: 'Other', cls: 'cat-other' },
+  Learning: { label: 'R\u0026D', cls: 'cat-rnd' },
+  Bug: { label: 'Bug', cls: 'cat-techdebt' },
+  Other: { label: 'Other', cls: 'cat-rnd' },
 };
 
 @Component({
@@ -86,9 +90,20 @@ export class PlanningComponent implements OnInit {
   get myHours(): number { return this.assignments().reduce((s, a) => s + a.plannedHours, 0); }
   get hoursLeft(): number { return 30 - this.myHours; }
   get myProgress(): number { return Math.min(100, Math.round((this.myHours / 30) * 100)); }
-  get isPlanning(): boolean { return this.cycle()?.status === 'Planning'; }
+  get isPlanning(): boolean {
+    const s = this.cycle();
+    return s?.state === 'PLANNING' || s?.status === 'Planning';
+  }
+  get isEmpty(): boolean { return !this.isLoading() && this.assignments().length === 0; }
   get canMarkReady(): boolean {
     return this.myHours > 0 && this.isPlanning && !this.isReady();
+  }
+
+  /** 'full' | 'almost' | 'none' */
+  get hoursAlertType(): 'full' | 'almost' | 'none' {
+    if (this.myHours >= 30) return 'full';
+    if (this.myHours >= 25) return 'almost';
+    return 'none';
   }
 
   categoryCls(cat: string): string {
@@ -108,85 +123,100 @@ export class PlanningComponent implements OnInit {
     this.isLoading.set(true);
     const user = this.currentUser();
 
+    if (!user) {
+      this.isLoading.set(false);
+      this.snack('No user selected.', true);
+      this.router.navigate(['/home']);
+      return;
+    }
+
+    // Always fetch from the API – handles direct navigation and page refresh.
     this.cycleService.loadActive().pipe(
-      switchMap((cycle) => {
-        if (!cycle) return of([null, null, null, []] as const);
-        this.cycle.set(cycle);
-        return forkJoin([
-          of(cycle),
-          this.progressService.getCycleDetail(cycle.id).pipe(catchError(() => of(null))),
-          this.progressService.getCategoryProgress(cycle.id).pipe(catchError(() => of([] as CategoryProgress[]))),
-          this.backlogService.getAll({}).pipe(catchError(() => of([] as BacklogItem[]))),
-        ] as const);
-      })
-    ).pipe(
-      switchMap(([cycle, detail, catProgress, items]) => {
-        if (!cycle || !detail || !user) {
-          this.isLoading.set(false);
-          return of(null);
-        }
+      catchError(() => of(null))
+    ).subscribe((cycle) => {
+      if (!cycle || (cycle.state !== 'PLANNING' && cycle.status !== 'Planning')) {
+        this.isLoading.set(false);
+        this.snack('Planning is not open right now.', true);
+        this.router.navigate(['/home']);
+        return;
+      }
 
-        // Build category cards
-        const cards: CategoryCard[] = (catProgress as CategoryProgress[]).map((cp) => {
-          const meta = CAT_META[cp.category] ?? { label: cp.category, cls: 'cat-other' };
-          return {
-            category: cp.category,
-            label: meta.label,
-            cls: meta.cls,
-            budgetHours: cp.budgetHours,
-            usedHours: cp.usedHours,
-            remaining: cp.remaining,
-            utilization: cp.utilization,
-          };
+      this.cycle.set(cycle);
+
+      // ── Find the user's MemberPlan embedded in the active cycle DTO ────────
+      const memberPlan = cycle.memberPlans?.find(mp => mp.memberId === user.id);
+      const memberPlanId = memberPlan?.id ?? null;
+
+      if (memberPlan) {
+        this.isReady.set(memberPlan.isReady);
+        this.cycleMember.set({
+          id: memberPlanId!,
+          teamMemberId: user.id,
+          name: user.name,
+          allocatedHours: 30,          // capacity is always 30h per cycle
+          isReady: memberPlan.isReady,
         });
-        this.categoryCards.set(cards);
-        this.backlogItems.set(items as BacklogItem[]);
+      }
 
-        // Find this user's CycleMember entry
-        const cm = (detail as any).members?.find(
-          (m: CycleMemberDetail) => m.teamMemberId === user.id
-        ) ?? null;
-        this.cycleMember.set(cm);
+      forkJoin([
+        this.progressService.getCategoryProgress(cycle.id).pipe(catchError(() => of([] as CategoryProgress[]))),
+        memberPlanId
+          // Backend: GET /api/cycles/{id}/members/{memberId}/progress  (memberId = TeamMember.Id)
+          ? this.progressService.getMemberProgress(cycle.id, user.id).pipe(catchError(() => of(null)))
+          : of(null),
+      ] as const).subscribe({
+        next: ([catProgress, memberProgress]) => {
+          // Category budget cards
+          const cards: CategoryCard[] = (catProgress as CategoryProgress[]).map((cp) => {
+            const meta = CAT_META[cp.category] ?? { label: cp.category, cls: 'cat-other' };
+            return {
+              category: cp.category, label: meta.label, cls: meta.cls,
+              budgetHours: cp.budgetHours, usedHours: cp.usedHours,
+              remaining: cp.remaining, utilization: cp.utilization,
+            };
+          });
+          this.categoryCards.set(cards);
 
-        if (!cm) { this.isLoading.set(false); return of(null); }
-
-        this.isReady.set(cm.isReady);
-
-        // Load this member's assignments via progress endpoint
-        return this.progressService.getMemberProgress(cycle.id, cm.id).pipe(catchError(() => of(null)));
-      })
-    ).subscribe({
-      next: (memberProgress: any) => {
-        if (memberProgress?.tasks) {
-          const cm = this.cycleMember();
-          const assignments: Assignment[] = memberProgress.tasks.map((t: any) => ({
-            id: t.assignmentId,
-            cycleMemberId: cm?.id ?? '',
-            backlogItemId: t.backlogItemId,
-            backlogItemTitle: t.title,
-            backlogItemCategory: t.category,
-            plannedHours: t.plannedHours,
-            createdAt: '',
-          }));
-          this.assignments.set(assignments);
-        }
-        this.isLoading.set(false);
-      },
-      error: () => {
-        this.isLoading.set(false);
-        this.snack('Failed to load planning data.', true);
-      },
+          // Assignments from member progress
+          if ((memberProgress as any)?.tasks) {
+            const cm = this.cycleMember();
+            const assignments: Assignment[] = (memberProgress as any).tasks.map((t: any) => ({
+              id: t.assignmentId,
+              cycleMemberId: cm?.id ?? '',
+              backlogItemId: t.backlogItemId,
+              backlogItemTitle: t.title,
+              backlogItemCategory: t.category,
+              plannedHours: t.plannedHours,
+              createdAt: '',
+              progressStatus: t.progressStatus,
+              hoursCompleted: t.hoursCompleted,
+            }));
+            this.assignments.set(assignments);
+          }
+          this.isLoading.set(false);
+        },
+        error: () => {
+          this.isLoading.set(false);
+          this.snack('Failed to load planning data.', true);
+        },
+      });
     });
   }
 
   // ── Change Hours ───────────────────────────────────────────────────────────
   openChangeHours(a: Assignment): void {
-    const item = this.backlogItems().find((i) => i.id === a.backlogItemId)
+    const cm = this.cycleMember();
+    if (!cm) {
+      this.snack('Member plan not found. Please refresh.', true);
+      return;
+    }
+
+    const item: BacklogItem = this.backlogItems().find((i) => i.id === a.backlogItemId)
       ?? {
         id: a.backlogItemId,
         title: a.backlogItemTitle,
         category: a.backlogItemCategory,
-        status: 'Active',
+        status: 'IN_PLAN',
         priority: 'Medium',
         createdAt: '',
       } as BacklogItem;
@@ -251,6 +281,7 @@ export class PlanningComponent implements OnInit {
       const cm = this.cycleMember();
       if (!cm) return;
       this.isMarkingReady.set(true);
+      // cm.id is MemberPlan.Id — markReady calls PUT /api/member-plans/{id}/ready
       this.assignmentService.markReady(cm.id).subscribe({
         next: () => {
           this.isMarkingReady.set(false);
