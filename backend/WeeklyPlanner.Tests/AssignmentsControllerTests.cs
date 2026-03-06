@@ -10,19 +10,18 @@ namespace WeeklyPlanner.Tests;
 
 public class AssignmentsControllerTests
 {
-    private readonly Mock<IAssignmentRepository> _repo;
-    private readonly Mock<ICycleRepository>      _cycles;
-    private readonly Mock<IBacklogRepository>    _backlog;
-    private readonly AssignmentsController       _controller;
-    private readonly MemberPlansController       _memberPlansController;
+    private readonly Mock<ITaskAssignmentRepository> _repo;
+    private readonly Mock<IMemberPlanRepository> _memberPlans;
+    private readonly Mock<IBacklogRepository> _backlog;
+    private readonly AssignmentsController _controller;
+    private readonly Mock<IUnitOfWork> _uow = new();
 
     public AssignmentsControllerTests()
     {
-        _repo    = new Mock<IAssignmentRepository>();
-        _cycles  = new Mock<ICycleRepository>();
+        _repo = new Mock<ITaskAssignmentRepository>();
+        _memberPlans = new Mock<IMemberPlanRepository>();
         _backlog = new Mock<IBacklogRepository>();
-        _controller            = new AssignmentsController(_repo.Object, _cycles.Object, _backlog.Object);
-        _memberPlansController = new MemberPlansController(_repo.Object);
+        _controller = new AssignmentsController(_repo.Object, _memberPlans.Object, _backlog.Object);
     }
 
     // ─── helpers ────────────────────────────────────────────────
