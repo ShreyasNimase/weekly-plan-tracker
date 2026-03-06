@@ -18,22 +18,26 @@ import { BacklogCategory } from '../../shared/enums/status.enum';
 import { ConfirmDialogComponent } from '../../shared/dialogs/confirm-dialog.component';
 
 export const CATEGORY_META: Record<string, { label: string; cls: string }> = {
+  CLIENT_FOCUSED: { label: 'Client Focused', cls: 'cat-client' },
+  TECH_DEBT: { label: 'Tech Debt', cls: 'cat-techdebt' },
+  R_AND_D: { label: 'R\u0026D', cls: 'cat-rnd' },
+  // legacy keys kept for any old data
   Feature: { label: 'Client Focused', cls: 'cat-client' },
   TechDebt: { label: 'Tech Debt', cls: 'cat-techdebt' },
-  Learning: { label: 'R&D', cls: 'cat-rnd' },
-  // legacy keys kept for backward compat with existing data
+  Learning: { label: 'R\u0026D', cls: 'cat-rnd' },
   Bug: { label: 'Bug', cls: 'cat-techdebt' },
   Other: { label: 'Other', cls: 'cat-rnd' },
 };
 
 const STATUS_OPTIONS = [
-  { value: 'Available', label: 'Available Only' },
   { value: '', label: 'Show All' },
-  { value: 'Archived', label: 'Archived Only' },
+  { value: 'AVAILABLE', label: 'Available Only' },
+  { value: 'IN_PLAN', label: 'In Current Plan' },
+  { value: 'COMPLETED', label: 'Completed' },
 ];
 
 /** Only the 3 primary filter categories shown in UI */
-const DISPLAY_CATEGORIES = ['Feature', 'TechDebt', 'Learning'];
+const DISPLAY_CATEGORIES = ['CLIENT_FOCUSED', 'TECH_DEBT', 'R_AND_D'];
 
 @Component({
   selector: 'app-backlog',
@@ -67,7 +71,7 @@ export class BacklogComponent implements OnInit {
 
   // ── Filter state ──────────────────────────────────────────────
   readonly activeCategories = signal<Set<string>>(new Set());
-  selectedStatus = 'Available';   // default: show Available only
+  selectedStatus = 'AVAILABLE';   // default: show Available items only
   searchTerm = '';
 
   readonly statusOptions = STATUS_OPTIONS;
@@ -88,7 +92,7 @@ export class BacklogComponent implements OnInit {
   });
 
   readonly archivedCount = computed(
-    () => this.allItems().filter((i) => i.status === 'Archived').length
+    () => this.allItems().filter((i) => i.status?.toUpperCase() === 'ARCHIVED').length
   );
 
   ngOnInit(): void {
@@ -120,12 +124,12 @@ export class BacklogComponent implements OnInit {
   }
 
   showArchived(): void {
-    this.selectedStatus = 'Archived';
+    this.selectedStatus = 'ARCHIVED';
   }
 
   clearFilters(): void {
     this.activeCategories.set(new Set());
-    this.selectedStatus = 'Available';
+    this.selectedStatus = 'AVAILABLE';
     this.searchTerm = '';
   }
 

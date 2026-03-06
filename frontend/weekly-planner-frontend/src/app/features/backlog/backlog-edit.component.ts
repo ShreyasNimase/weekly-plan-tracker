@@ -41,12 +41,10 @@ export class BacklogEditComponent implements OnInit {
   readonly editId = signal<string | null>(null);
   readonly itemStatus = signal<string>('');
 
-  readonly categories: { value: BacklogCategory; label: string }[] = [
-    { value: BacklogCategory.Feature, label: 'Feature' },
-    { value: BacklogCategory.Bug, label: 'Bug' },
-    { value: BacklogCategory.TechDebt, label: 'Tech Debt' },
-    { value: BacklogCategory.Learning, label: 'Learning' },
-    { value: BacklogCategory.Other, label: 'Other' },
+  readonly categories: { value: string; label: string }[] = [
+    { value: 'CLIENT_FOCUSED', label: 'Client Focused' },
+    { value: 'TECH_DEBT', label: 'Tech Debt' },
+    { value: 'R_AND_D', label: 'R\u0026D' },
   ];
 
   readonly priorities: { value: BacklogPriority; label: string }[] = [
