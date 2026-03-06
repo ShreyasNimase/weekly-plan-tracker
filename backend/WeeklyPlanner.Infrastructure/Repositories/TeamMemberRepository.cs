@@ -5,6 +5,9 @@ using WeeklyPlanner.Infrastructure.Data;
 
 namespace WeeklyPlanner.Infrastructure.Repositories;
 
+/// <summary>
+/// Repository for team members. Call <see cref="IUnitOfWork.SaveChangesAsync"/> after add/update.
+/// </summary>
 public class TeamMemberRepository : ITeamMemberRepository
 {
     private readonly AppDbContext _context;
@@ -14,51 +17,52 @@ public class TeamMemberRepository : ITeamMemberRepository
         _context = context;
     }
 
-    public async Task<TeamMember> AddAsync(TeamMember teamMember)
+    /// <inheritdoc />
+    public async Task<TeamMember> AddAsync(TeamMember teamMember, CancellationToken cancellationToken = default)
     {
         _context.TeamMembers.Add(teamMember);
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(cancellationToken);
         return teamMember;
     }
 
-    public async Task<IEnumerable<TeamMember>> GetAllActiveAsync()
+    /// <inheritdoc />
+    public async Task<IEnumerable<TeamMember>> GetAllActiveAsync(CancellationToken cancellationToken = default)
     {
         return await _context.TeamMembers
             .Where(m => m.IsActive)
             .OrderBy(m => m.CreatedAt)
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
     }
 
-    public async Task<IEnumerable<TeamMember>> GetAllAsync()
+    /// <inheritdoc />
+    public async Task<IEnumerable<TeamMember>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         return await _context.TeamMembers
             .OrderBy(m => m.CreatedAt)
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
     }
 
-    public async Task<TeamMember?> GetByIdAsync(Guid id)
+    /// <inheritdoc />
+    public async Task<TeamMember?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        return await _context.TeamMembers.FindAsync(id);
+        return await _context.TeamMembers.FindAsync([id], cancellationToken);
     }
 
-    public async Task<TeamMember> UpdateAsync(TeamMember teamMember)
+    /// <inheritdoc />
+    public async Task<TeamMember> UpdateAsync(TeamMember teamMember, CancellationToken cancellationToken = default)
     {
         _context.TeamMembers.Update(teamMember);
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(cancellationToken);
         return teamMember;
     }
 
-    /// <summary>
-    /// Returns true if the member is part of any cycle that is not yet Completed or Cancelled.
-    /// Used by Deactivate endpoint to prevent removing active participants.
-    /// </summary>
-    public async Task<bool> IsInActiveCycleAsync(Guid id)
+    /// <inheritdoc />
+    public async Task<bool> IsInActiveCycleAsync(Guid id, CancellationToken cancellationToken = default)
     {
         return await _context.CycleMembers
             .AnyAsync(cm =>
-                cm.TeamMemberId == id &&
-                cm.Cycle.Status != WeeklyPlanner.Core.Enums.CycleStatus.Completed &&
-                cm.Cycle.Status != WeeklyPlanner.Core.Enums.CycleStatus.Cancelled);
+                cm.MemberId == id &&
+                cm.Cycle.State != "COMPLETED",
+                cancellationToken);
     }
 }
-

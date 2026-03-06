@@ -1,11 +1,13 @@
 using Microsoft.EntityFrameworkCore;
 using WeeklyPlanner.Core.Entities;
-using WeeklyPlanner.Core.Enums;
 using WeeklyPlanner.Core.Interfaces;
 using WeeklyPlanner.Infrastructure.Data;
 
 namespace WeeklyPlanner.Infrastructure.Repositories;
 
+/// <summary>
+/// Repository for backlog items. Category/Status are strings. Call <see cref="IUnitOfWork.SaveChangesAsync"/> after add/update/delete.
+/// </summary>
 public class BacklogRepository : IBacklogRepository
 {
     private readonly AppDbContext _context;
@@ -15,31 +17,36 @@ public class BacklogRepository : IBacklogRepository
         _context = context;
     }
 
-    public async Task<BacklogItem> AddAsync(BacklogItem item)
+    /// <inheritdoc />
+    public async Task<BacklogItem> AddAsync(BacklogItem item, CancellationToken cancellationToken = default)
     {
         _context.BacklogItems.Add(item);
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(cancellationToken);
         return item;
     }
 
-    public async Task<IEnumerable<BacklogItem>> GetAllAsync(
-        BacklogCategory? category,
-        BacklogStatus? status,
-        string? search)
+    /// <inheritdoc />
+    public async Task<IEnumerable<BacklogItem>> GetAllAsync(string? category, string? status, string? search, CancellationToken cancellationToken = default)
     {
         var query = _context.BacklogItems.AsQueryable();
 
-        // Filter by category if provided
-        if (category.HasValue)
-            query = query.Where(i => i.Category == category.Value);
+        if (!string.IsNullOrWhiteSpace(category))
+            query = query.Where(i => i.Category == category);
 
-        // Filter by status if provided; default to Active only when null
-        if (status.HasValue)
-            query = query.Where(i => i.Status == status.Value);
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            if (status.Equals("ALL", StringComparison.OrdinalIgnoreCase))
+                _ = query; // no status filter
+            else if (status.Equals("ARCHIVED", StringComparison.OrdinalIgnoreCase))
+                query = query.Where(i => i.Status == "ARCHIVED");
+            else if (status.Equals("COMPLETED", StringComparison.OrdinalIgnoreCase))
+                query = query.Where(i => i.Status == "COMPLETED");
+            else
+                query = query.Where(i => i.Status == status);
+        }
         else
-            query = query.Where(i => i.Status == BacklogStatus.Active);
+            query = query.Where(i => i.Status == "AVAILABLE" || i.Status == "IN_PLAN");
 
-        // Case-insensitive search on title and description
         if (!string.IsNullOrWhiteSpace(search))
         {
             var lower = search.Trim().ToLower();
@@ -49,30 +56,32 @@ public class BacklogRepository : IBacklogRepository
         }
 
         return await query
-            .OrderByDescending(i => i.Priority)
-            .ThenBy(i => i.CreatedAt)
-            .ToListAsync();
+            .OrderByDescending(i => i.CreatedAt)
+            .ToListAsync(cancellationToken);
     }
 
-    public async Task<BacklogItem?> GetByIdAsync(Guid id)
+    /// <inheritdoc />
+    public async Task<BacklogItem?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        return await _context.BacklogItems.FindAsync(id);
+        return await _context.BacklogItems.FindAsync([id], cancellationToken);
     }
 
-    public async Task<BacklogItem> UpdateAsync(BacklogItem item)
+    /// <inheritdoc />
+    public async Task<BacklogItem> UpdateAsync(BacklogItem item, CancellationToken cancellationToken = default)
     {
         _context.BacklogItems.Update(item);
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(cancellationToken);
         return item;
     }
 
-    public async Task DeleteAsync(Guid id)
+    /// <inheritdoc />
+    public async Task DeleteAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var item = await _context.BacklogItems.FindAsync(id);
+        var item = await _context.BacklogItems.FindAsync([id], cancellationToken);
         if (item is not null)
         {
             _context.BacklogItems.Remove(item);
-            await _context.SaveChangesAsync();
+            await _context.SaveChangesAsync(cancellationToken);
         }
     }
 }
