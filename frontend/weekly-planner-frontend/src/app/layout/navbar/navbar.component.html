@@ -1,0 +1,34 @@
+<nav class="wpt-nav">
+  <div class="nav-inner">
+    <a routerLink="/home" class="nav-brand">
+      <mat-icon>event_note</mat-icon>
+      <span>Weekly Planner</span>
+    </a>
+    <div class="nav-actions">
+      @if (currentUser()) {
+        <div class="user-chip">
+          <div class="user-avatar">{{ userInitials }}</div>
+          <span class="user-name">{{ currentUser()!.name }}</span>
+          @if (isLead()) {
+            <span class="role-badge lead">Lead</span>
+          }
+          @if (!isLead()) {
+            <span class="role-badge member">Member</span>
+          }
+        </div>
+        <a mat-button routerLink="/identity" class="nav-btn" matTooltip="Switch User">
+          <mat-icon>swap_horiz</mat-icon>
+        </a>
+        @if (!isOnHomeOrIdentity()) {
+          <a mat-button routerLink="/home" class="nav-btn" matTooltip="Home">
+            <mat-icon>home</mat-icon>
+          </a>
+        }
+      }
+      <button type="button" class="nav-btn" (click)="toggleTheme()"
+        [matTooltip]="isDark() ? 'Light mode' : 'Dark mode'">
+        <mat-icon>{{ isDark() ? 'light_mode' : 'dark_mode' }}</mat-icon>
+      </button>
+    </div>
+  </div>
+</nav>
