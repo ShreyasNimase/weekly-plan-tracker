@@ -173,7 +173,8 @@ public class TeamMemberServiceTests
     public async Task Deactivate_Success_ReturnsUpdated()
     {
         var id = Guid.NewGuid();
-        var member = new TeamMember { Id = id, Name = "Alice", IsActive = true, IsLead = true };
+        // Use a regular (non-lead) member — leads cannot be deactivated directly.
+        var member = new TeamMember { Id = id, Name = "Alice", IsActive = true, IsLead = false };
         _repo.Setup(r => r.GetByIdAsync(id, It.IsAny<CancellationToken>())).ReturnsAsync(member);
         _repo.Setup(r => r.IsInActiveCycleAsync(id, It.IsAny<CancellationToken>())).ReturnsAsync(false);
         _repo.Setup(r => r.UpdateAsync(It.IsAny<TeamMember>(), It.IsAny<CancellationToken>())).ReturnsAsync((TeamMember m, CancellationToken _) => m);
@@ -181,8 +182,20 @@ public class TeamMemberServiceTests
         var (result, error) = await _service.DeactivateAsync(id);
         Assert.NotNull(result);
         Assert.False(result.IsActive);
-        Assert.False(result.IsLead);
         Assert.Null(error);
+    }
+
+    [Fact]
+    public async Task Deactivate_IsLead_ReturnsError()
+    {
+        var id = Guid.NewGuid();
+        var member = new TeamMember { Id = id, Name = "Alice", IsActive = true, IsLead = true };
+        _repo.Setup(r => r.GetByIdAsync(id, It.IsAny<CancellationToken>())).ReturnsAsync(member);
+
+        var (result, error) = await _service.DeactivateAsync(id);
+        Assert.Null(result);
+        Assert.NotNull(error);
+        Assert.Contains("Team Lead", error, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
