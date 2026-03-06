@@ -1,0 +1,66 @@
+<div class="setup-page">
+  <div class="setup-card wpt-card">
+    <div class="setup-icon">
+      <mat-icon>groups</mat-icon>
+    </div>
+    <h1>Set up your team</h1>
+    <p>Add your team members to get started.</p>
+
+    <div class="input-row">
+      <mat-form-field appearance="outline" class="flex-grow">
+        <mat-label>Team member name</mat-label>
+        <mat-icon matPrefix>person_add</mat-icon>
+        <input matInput [(ngModel)]="nameInput"
+          (keydown.enter)="onEnterKey($event)" maxlength="50"
+          placeholder="Type a name here">
+      </mat-form-field>
+      <button mat-flat-button class="btn-primary"
+        (click)="addMember()"
+        [disabled]="!nameInput.trim()">
+        Add
+      </button>
+    </div>
+
+    <div class="setup-members-list">
+      @for (member of members(); track member.name; let i = $index) {
+        <div class="setup-member-row">
+          <div class="member-info">
+            <div class="mini-avatar">{{ member.name.charAt(0).toUpperCase() }}</div>
+            <span class="member-name">{{ member.name }}</span>
+            @if (member.isLead) {
+              <span class="role-badge lead">Lead</span>
+            }
+          </div>
+          <div class="member-actions">
+            @if (!member.isLead) {
+              <button mat-button class="btn-secondary" (click)="makeLead(i)" matTooltip="Make this person the Team Lead">
+                Make Lead
+              </button>
+            }
+            <button mat-icon-button color="warn" (click)="removeMember(i)" matTooltip="Remove {{ member.name }}">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+        </div>
+      }
+      @if (members().length === 0) {
+        <div class="empty-setup">
+          <mat-icon>group_add</mat-icon>
+          <p>Add your first team member above</p>
+        </div>
+      }
+    </div>
+
+    <button mat-flat-button class="btn-primary done-btn"
+      [disabled]="!canDone || isLoading()"
+      (click)="onDone()">
+      @if (isLoading()) {
+        <mat-spinner diameter="18"></mat-spinner>
+        Saving...
+      } @else {
+        <mat-icon>check</mat-icon>
+        Let's Go
+      }
+    </button>
+  </div>
+</div>
