@@ -1,0 +1,26 @@
+<footer class="app-footer">
+  <button mat-button class="footer-btn" (click)="download()" [disabled]="isDownloading()"
+    matTooltip="Download a full JSON backup of your data">
+    @if (isDownloading()) {
+      <mat-spinner diameter="16"></mat-spinner>
+    } @else {
+      <mat-icon>download</mat-icon>
+    }
+    Export Data
+  </button>
+  <button mat-button class="footer-btn" (click)="openImportDialog()"
+    matTooltip="Restore data from a previously downloaded backup file">
+    <mat-icon>upload_file</mat-icon>
+    Import Data
+  </button>
+  <button mat-button class="footer-btn" (click)="openSeedDialog()"
+    matTooltip="Populate the app with demo data for testing">
+    <mat-icon>dataset</mat-icon>
+    Load Sample Data
+  </button>
+  <button mat-button class="footer-btn footer-btn-danger" (click)="openResetDialog()"
+    matTooltip="Permanently erase all application data">
+    <mat-icon>restart_alt</mat-icon>
+    Reset App
+  </button>
+</footer>

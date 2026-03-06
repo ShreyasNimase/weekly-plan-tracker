@@ -1,0 +1,97 @@
+<div class="page-wrapper">
+  <button type="button" class="back-link" (click)="cancel()">
+    <mat-icon>arrow_back</mat-icon>
+    Go Back
+  </button>
+
+  @if (isLoading()) {
+  <div class="flex-center" style="padding: 80px 0;">
+    <mat-spinner diameter="52"></mat-spinner>
+  </div>
+  } @else {
+  <div class="page-header">
+    <h1>{{ pageTitle }}</h1>
+    <p class="subtitle">{{ isEditMode ? 'Update the details below and save.' : 'Fill in the details and save.' }}</p>
+  </div>
+
+  <div class="wpt-card edit-form-card">
+    @if (isEditMode && itemStatus() === 'Archived') {
+    <div class="banner warning">
+      <mat-icon>archive</mat-icon>
+      <span>This item is archived. Saving will keep it archived.</span>
+    </div>
+    }
+
+    @if (isEditMode && itemStatus()) {
+    <div class="status-row">
+      <span class="section-label">Current status</span>
+      <span class="status-badge backlog-status">{{ itemStatus() }}</span>
+    </div>
+    }
+
+    <form [formGroup]="form" class="edit-form">
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Title</mat-label>
+        <input matInput formControlName="title" placeholder="What is this work about?" maxlength="200" />
+        @if (form.controls.title.hasError('required') && form.controls.title.touched) {
+        <mat-error>Title is required.</mat-error>
+        }
+        @if (form.controls.title.hasError('minlength') && form.controls.title.touched) {
+        <mat-error>Title must be at least 3 characters.</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Description</mat-label>
+        <textarea matInput formControlName="description" placeholder="Add more details here (optional)" rows="4"
+          style="resize: vertical;"></textarea>
+      </mat-form-field>
+
+      <div class="two-col">
+        <mat-form-field appearance="outline">
+          <mat-label>Category</mat-label>
+          <mat-select formControlName="category">
+            <mat-option value="" disabled>Pick a category</mat-option>
+            @for (cat of categories; track cat.value) {
+            <mat-option [value]="cat.value">{{ cat.label }}</mat-option>
+            }
+          </mat-select>
+          @if (form.controls.category.hasError('required') && form.controls.category.touched) {
+          <mat-error>Please pick a category.</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Estimated hours (optional)</mat-label>
+          <mat-icon matPrefix>schedule</mat-icon>
+          <input matInput type="number" formControlName="estimatedHours" placeholder="Hours" min="0.5" step="0.5" />
+          @if (form.controls.estimatedHours.hasError('min') && form.controls.estimatedHours.touched) {
+          <mat-error>Minimum is 0.5 hours.</mat-error>
+          }
+        </mat-form-field>
+      </div>
+
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Priority</mat-label>
+        <mat-select formControlName="priority">
+          @for (p of priorities; track p.value) {
+          <mat-option [value]="p.value">{{ p.label }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    </form>
+
+    <div class="edit-actions">
+      <button mat-button class="btn-secondary" (click)="cancel()" [disabled]="isSaving()">Cancel</button>
+      <button mat-flat-button class="btn-primary" [disabled]="form.invalid || isSaving()" (click)="save()">
+        @if (isSaving()) {
+        <mat-spinner diameter="18"></mat-spinner>
+        Saving…
+        } @else {
+        <ng-container><mat-icon>save</mat-icon> {{ saveLabel }}</ng-container>
+        }
+      </button>
+    </div>
+  </div>
+  }
+</div>

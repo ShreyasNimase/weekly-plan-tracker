@@ -1,0 +1,68 @@
+.past-cycles-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cycle-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  text-decoration: none;
+  color: inherit;
+  transition: all 0.2s ease;
+}
+
+.cycle-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.cycle-icon {
+  color: var(--text-muted);
+  font-size: 24px;
+  width: 24px;
+  height: 24px;
+}
+
+.cycle-title {
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--text-primary);
+  display: block;
+  margin-bottom: 4px;
+}
+
+.cycle-left .badge {
+  margin-top: 4px;
+}
+
+.cycle-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.member-chip {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.view-arrow {
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
+  color: var(--text-muted);
+}
+
+.empty-state mat-icon {
+  font-size: 48px;
+  width: 48px;
+  height: 48px;
+  display: block;
+  margin-bottom: 8px;
+}

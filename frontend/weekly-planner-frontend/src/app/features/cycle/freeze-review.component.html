@@ -1,0 +1,177 @@
+<div class="page-wrapper">
+  <a routerLink="/home" class="back-link">
+    <mat-icon>arrow_back</mat-icon>
+    Home
+  </a>
+
+  @if (isLoading()) {
+  <div class="flex-center" style="padding: 80px 0;"><mat-spinner diameter="52"></mat-spinner></div>
+  } @else if (hasError()) {
+  <div class="banner danger">
+    <mat-icon>error_outline</mat-icon>
+    <span>Failed to load cycle data. Please refresh the page.</span>
+  </div>
+  } @else if (cycle()) {
+  <div class="page-header header-with-chip">
+    <div>
+      <h2>Review the Team's Plan</h2>
+      <p class="subtitle">
+        Week of <strong>{{ cycle()!.weekStartDate }}</strong> ·
+        {{ totalMembers }} team member{{ totalMembers !== 1 ? 's' : '' }} ·
+        {{ totalBudgetHours }}h total
+      </p>
+    </div>
+    @if (isFrozen) {
+    <span class="frozen-chip"><mat-icon>lock</mat-icon> Frozen</span>
+    }
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card">
+      <mat-icon>group</mat-icon>
+      <div class="stat-value">{{ totalMembers }}</div>
+      <div class="stat-label">Total Members</div>
+    </div>
+    <div class="stat-card">
+      <mat-icon>schedule</mat-icon>
+      <div class="stat-value">{{ totalBudgetHours }}h</div>
+      <div class="stat-label">Total Hours</div>
+    </div>
+    <div class="stat-card">
+      <mat-icon>check_circle</mat-icon>
+      <div class="stat-value">{{ memberRows.filter(r => r.isReady).length }} / {{ memberRows.length }}</div>
+      <div class="stat-label">Ready Members</div>
+    </div>
+  </div>
+
+  <div class="wpt-card">
+    <p class="section-label">Category Summary</p>
+    <table class="wpt-table">
+      <thead>
+        <tr>
+          <th>Category</th>
+          <th>Budget</th>
+          <th>Planned</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (row of categoryRows; track row.category) {
+        <tr>
+          <td><span class="badge"
+              [ngClass]="row.cls === 'cat-client' || row.cls === 'cat-feature' ? 'badge-client' : row.cls === 'cat-techdebt' ? 'badge-tech' : 'badge-rd'">{{
+              row.label }}</span></td>
+          <td>{{ row.budgetHours }}h</td>
+          <td>{{ row.plannedHours }}h</td>
+          <td [ngClass]="getStatusCls(row)">
+            @if (row.delta === 0) {
+            <mat-icon class="status-icon">check_circle</mat-icon>
+            {{ getStatusText(row) }}
+            } @else {
+            <mat-icon class="status-icon">warning</mat-icon>
+            {{ getStatusText(row) }}
+            }
+          </td>
+        </tr>
+        }
+      </tbody>
+    </table>
+    @if (categoryRows.length === 0) {
+    <p class="text-muted" style="text-align: center; padding: 16px;">No category allocations configured.</p>
+    }
+  </div>
+
+  <div class="wpt-card">
+    <p class="section-label">Member Summary</p>
+    <table class="wpt-table">
+      <thead>
+        <tr>
+          <th>Member</th>
+          <th>Allocated</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (row of memberRows; track row.name) {
+        <tr>
+          <td class="member-name">{{ row.name }}</td>
+          <td>
+            <span [class.hours-ok]="row.allocatedHours >= 30" [class.hours-low]="row.allocatedHours < 30">
+              {{ row.allocatedHours }}h / 30h
+            </span>
+          </td>
+          <td [class.status-ok]="row.isReady" [class.text-muted]="!row.isReady">
+            {{ row.isReady ? '✓ Ready' : 'Not yet' }}
+          </td>
+        </tr>
+        }
+      </tbody>
+    </table>
+    @if (memberRows.length === 0) {
+    <p class="text-muted" style="text-align: center; padding: 16px;">No members assigned to this cycle.</p>
+    }
+  </div>
+
+  @if (hasIssues) {
+  <div class="banner danger issues-panel">
+    <mat-icon>block</mat-icon>
+    <div>
+      <strong>Can't freeze yet:</strong>
+      <ul class="issues-list">
+        @for (issue of issues; track issue.text) {
+        <li>{{ issue.text }}</li>
+        }
+      </ul>
+    </div>
+  </div>
+  } @else if (!isFrozen) {
+  <div class="banner success">
+    <mat-icon>check_circle</mat-icon>
+    <span>All checks passed! Ready to freeze.</span>
+  </div>
+  }
+
+  @if (!isFrozen) {
+  <div class="freeze-action-bar">
+
+    <!-- Validation summary -->
+    @if (hasIssues) {
+    <div class="banner danger freeze-validation">
+      <mat-icon>error_outline</mat-icon>
+      <div>
+        <strong>Can't freeze yet:</strong>
+        <ul class="issues-list" style="margin: 6px 0 0; padding-left: 16px;">
+          @for (issue of issues; track issue.text) {
+          <li style="font-size: 0.85rem; margin-bottom: 2px;">{{ issue.text }}</li>
+          }
+        </ul>
+      </div>
+    </div>
+    } @else {
+    <div class="banner success freeze-validation">
+      <mat-icon>check_circle</mat-icon>
+      <span>Everything looks good! You can freeze the plan.</span>
+    </div>
+    }
+
+    <!-- Buttons row -->
+    <div class="freeze-buttons">
+      <button mat-flat-button class="btn-primary freeze-btn" [disabled]="!canFreeze" (click)="openFreezeDialog()">
+        @if (isSubmitting()) {
+        <mat-spinner diameter="18"></mat-spinner>
+        Freezing…
+        } @else {
+        <ng-container><mat-icon>ac_unit</mat-icon> ❄️ Freeze the Plan</ng-container>
+        }
+      </button>
+
+      <button mat-stroked-button class="cancel-planning-btn" [disabled]="isSubmitting()" (click)="openCancelDialog()">
+        <mat-icon>cancel</mat-icon>
+        Cancel Planning
+      </button>
+    </div>
+
+  </div><!-- end freeze-action-bar -->
+  }
+  }
+</div>

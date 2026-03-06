@@ -1,0 +1,142 @@
+.header-with-chip {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.frozen-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--primary-light);
+  color: var(--primary);
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  flex-shrink: 0;
+
+  mat-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+  }
+}
+
+.stat-card mat-icon {
+  font-size: 28px;
+  width: 28px;
+  height: 28px;
+  color: var(--text-muted);
+}
+
+.wpt-table .status-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  vertical-align: middle;
+  margin-right: 4px;
+}
+
+.hours-ok {
+  color: var(--success);
+  font-weight: 600;
+}
+
+.hours-low {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.status-ok {
+  color: var(--success);
+}
+
+.issues-panel .issues-list {
+  margin: 8px 0 0 0;
+  padding-left: 20px;
+
+  li {
+    font-size: 0.875rem;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+  }
+}
+
+.action-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 24px;
+}
+
+/* ── Sticky freeze action bar ──────────────────────────────────────────────── */
+.freeze-action-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  background: var(--bg, #fff);
+  border-top: 1px solid var(--border);
+  padding: 16px 0 8px;
+  margin-top: 24px;
+}
+
+.freeze-validation {
+  margin-bottom: 12px;
+}
+
+.freeze-buttons {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.freeze-btn {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  height: 44px !important;
+  font-weight: 700 !important;
+  font-size: 0.95rem !important;
+  border-radius: 10px !important;
+  padding: 0 24px !important;
+
+  mat-icon {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+  }
+}
+
+.cancel-planning-btn {
+  border: 1.5px solid var(--danger, #ef4444) !important;
+  color: var(--danger, #ef4444) !important;
+  height: 44px !important;
+  border-radius: 10px !important;
+  font-weight: 600 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  padding: 0 20px !important;
+  cursor: pointer !important;
+  background: transparent !important;
+  transition: background 0.15s !important;
+
+  &:hover:not([disabled]) {
+    background: var(--danger-light, rgba(239, 68, 68, 0.08)) !important;
+  }
+
+  mat-icon {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+  }
+}
+
+/* Legacy selector kept for safety */
+.cancel-plan-btn {
+  @extend .cancel-planning-btn;
+}
