@@ -4,6 +4,6 @@ namespace WeeklyPlanner.Core.DTOs;
 
 public class StartCycleDto
 {
-    [Required(ErrorMessage = "WeekStartDate is required.")]
-    public DateTime WeekStartDate { get; set; }
+    [Required(ErrorMessage = "PlanningDate is required (must be a Tuesday).")]
+    public DateTime PlanningDate { get; set; }
 }

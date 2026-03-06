@@ -1,5 +1,4 @@
 using System.ComponentModel.DataAnnotations;
-using WeeklyPlanner.Core.Enums;
 
 namespace WeeklyPlanner.Core.DTOs;
 
@@ -10,14 +9,15 @@ public class SetupCycleDto
     public List<Guid> MemberIds { get; set; } = [];
 
     [Required]
-    [MinLength(1, ErrorMessage = "At least one category budget is required.")]
-    public List<CategoryBudgetDto> CategoryBudgets { get; set; } = [];
+    [MinLength(1, ErrorMessage = "At least one category allocation is required.")]
+    public List<CategoryAllocationDto> CategoryAllocations { get; set; } = [];
 }
 
-public class CategoryBudgetDto
+public class CategoryAllocationDto
 {
-    public BacklogCategory Category { get; set; }
+    /// <summary>CLIENT_FOCUSED, TECH_DEBT, or R_AND_D.</summary>
+    public string Category { get; set; } = string.Empty;
 
-    [Range(0.1, 100, ErrorMessage = "Percentage must be between 0.1 and 100.")]
-    public decimal Percentage { get; set; }
+    [Range(0, 100, ErrorMessage = "Percentage must be between 0 and 100.")]
+    public int Percentage { get; set; }
 }
