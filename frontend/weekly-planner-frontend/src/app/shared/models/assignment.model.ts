@@ -15,9 +15,9 @@ export interface Assignment {
 
 // POST /api/assignments
 export interface ClaimBacklogItemDto {
-    cycleMemberId: string;      // Guid
+    memberPlanId: string;       // MemberPlan.Id (NOT CycleMember.Id)
     backlogItemId: string;      // Guid
-    plannedHours: number;       // 0.5 increments, max 30
+    committedHours: number;     // backend field is CommittedHours, not plannedHours. 0.5 increments, max 30
 }
 
 // PUT /api/assignments/{id}
