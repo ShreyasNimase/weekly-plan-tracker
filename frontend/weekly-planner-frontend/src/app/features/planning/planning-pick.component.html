@@ -1,0 +1,68 @@
+<div class="page-wrapper">
+  @if (toastMsg()) {
+    <div class="wpt-toast success">
+      <mat-icon>check_circle</mat-icon>
+      {{ toastMsg() }} ✓
+    </div>
+  }
+
+  <a routerLink="/planning" class="back-link">
+    <mat-icon>arrow_back</mat-icon>
+    Go Back
+  </a>
+
+  <div class="page-header">
+    <h1>Pick a Backlog Item</h1>
+    <p class="subtitle">You have <strong>{{ myHoursLeft() }}h</strong> left to plan.</p>
+  </div>
+
+  @if (budgetPills().length > 0) {
+    <div class="filter-pills">
+      @for (pill of budgetPills(); track pill.category) {
+        <div class="filter-pill" [class.zero]="pill.remaining <= 0">
+          <span class="cat-dot" [ngClass]="pill.cls"></span>
+          {{ pill.label }}: <strong>{{ pill.remaining }}h left</strong>
+        </div>
+      }
+    </div>
+  }
+
+  @if (isLoading()) {
+    <div class="flex-center" style="padding: 60px 0;"><mat-spinner diameter="48"></mat-spinner></div>
+  } @else {
+    <div class="pick-list">
+      @if (availableItems().length === 0) {
+        <div class="empty-pick-state">
+          <mat-icon>check_box</mat-icon>
+          <p>No available backlog items to pick.</p>
+        </div>
+      }
+
+      @for (item of availableItems(); track item.id) {
+        <div class="item-row pick-row">
+          <div class="pick-left">
+            <span class="cat-dot" [ngClass]="getCatMeta(item.category).cls"></span>
+            <div class="pick-content">
+              <span class="row-title">{{ item.title }}</span>
+              <div class="pick-meta">
+                <span class="badge" [ngClass]="getCatMeta(item.category).cls === 'cat-client' ? 'badge-client' : getCatMeta(item.category).cls === 'cat-techdebt' ? 'badge-tech' : 'badge-rd'">
+                  {{ getCatMeta(item.category).label }}
+                </span>
+                @if (item.estimatedHours) {
+                  <span class="row-meta">{{ item.estimatedHours }}h est.</span>
+                }
+                @if (item.description) {
+                  <span class="desc-snippet">{{ item.description }}</span>
+                }
+              </div>
+            </div>
+          </div>
+          <button mat-flat-button class="btn-primary pick-btn" [disabled]="myHoursLeft() <= 0" (click)="pickItem(item)">
+            <mat-icon>add_task</mat-icon>
+            Pick
+          </button>
+        </div>
+      }
+    </div>
+  }
+</div>
