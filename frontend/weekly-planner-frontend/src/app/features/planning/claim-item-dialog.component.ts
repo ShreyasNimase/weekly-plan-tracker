@@ -13,28 +13,28 @@ import { Assignment } from '../../shared/models/assignment.model';
 import { BacklogItem } from '../../shared/models/backlog-item.model';
 
 export interface ClaimDialogData {
-    cycleMemberId: string;  // This is CycleMember.Id (PK of the junction table)
-    cycleId: string;
-    remainingHours: number;
-    existingAssignments: Assignment[];
-    backlogItems: BacklogItem[];
+  cycleMemberId: string;  // This is CycleMember.Id (PK of the junction table)
+  cycleId: string;
+  remainingHours: number;
+  existingAssignments: Assignment[];
+  backlogItems: BacklogItem[];
 }
 
 @Component({
-    selector: 'app-claim-item-dialog',
-    standalone: true,
-    imports: [
-        ReactiveFormsModule,
-        MatDialogModule,
-        MatFormFieldModule,
-        MatInputModule,
-        MatSelectModule,
-        MatButtonModule,
-        MatIconModule,
-        MatProgressSpinnerModule,
-        MatSnackBarModule,
-    ],
-    template: `
+  selector: 'app-claim-item-dialog',
+  standalone: true,
+  imports: [
+    ReactiveFormsModule,
+    MatDialogModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatSelectModule,
+    MatButtonModule,
+    MatIconModule,
+    MatProgressSpinnerModule,
+    MatSnackBarModule,
+  ],
+  template: `
     <div class="dialog-header">
       <mat-icon class="dialog-icon">add_task</mat-icon>
       <h2 mat-dialog-title>Claim a Task</h2>
@@ -100,7 +100,7 @@ export interface ClaimDialogData {
       </button>
     </mat-dialog-actions>
   `,
-    styles: [`
+  styles: [`
     .dialog-header {
       display: flex; align-items: center; gap: 10px;
       padding: 20px 24px 0;
@@ -125,54 +125,54 @@ export interface ClaimDialogData {
   `],
 })
 export class ClaimItemDialogComponent {
-    readonly data = inject<ClaimDialogData>(MAT_DIALOG_DATA);
-    private readonly assignmentService = inject(AssignmentService);
-    private readonly dialogRef = inject(MatDialogRef<ClaimItemDialogComponent>);
-    private readonly snackBar = inject(MatSnackBar);
-    private readonly fb = inject(FormBuilder);
+  readonly data = inject<ClaimDialogData>(MAT_DIALOG_DATA);
+  private readonly assignmentService = inject(AssignmentService);
+  private readonly dialogRef = inject(MatDialogRef<ClaimItemDialogComponent>);
+  private readonly snackBar = inject(MatSnackBar);
+  private readonly fb = inject(FormBuilder);
 
-    readonly isLoading = signal(false);
+  readonly isLoading = signal(false);
 
-    readonly form = this.fb.group({
-        backlogItemId: ['', Validators.required],
-        plannedHours: [
-            null as number | null,
-            [Validators.required, Validators.min(0.5), Validators.max(this.data.remainingHours)],
-        ],
+  readonly form = this.fb.group({
+    backlogItemId: ['', Validators.required],
+    plannedHours: [
+      null as number | null,
+      [Validators.required, Validators.min(0.5), Validators.max(this.data.remainingHours)],
+    ],
+  });
+
+  /** Filter out already-claimed items */
+  get availableItems(): BacklogItem[] {
+    const claimedIds = new Set(this.data.existingAssignments.map(a => a.backlogItemId));
+    return this.data.backlogItems.filter(
+      item => !claimedIds.has(item.id) && item.status?.toUpperCase() !== 'ARCHIVED'
+    );
+  }
+
+  onClaim(): void {
+    if (this.form.invalid) return;
+    const hours = this.form.value.plannedHours!;
+
+    if (hours % 0.5 !== 0) {
+      this.snackBar.open('Hours must be in 0.5 increments (e.g. 1.5, 2.0)', 'Dismiss', { duration: 5000 });
+      return;
+    }
+
+    this.isLoading.set(true);
+    this.assignmentService.claim({
+      memberPlanId: this.data.cycleMemberId,  // data.cycleMemberId holds the MemberPlan.Id
+      backlogItemId: this.form.value.backlogItemId!,
+      committedHours: hours,
+    }).subscribe({
+      next: (assignment) => {
+        this.snackBar.open('Task claimed!', 'Close', { duration: 3000 });
+        this.dialogRef.close(assignment);
+      },
+      error: (err) => {
+        this.isLoading.set(false);
+        const msg = err?.error?.message ?? 'Failed to claim task.';
+        this.snackBar.open(msg, 'Dismiss', { duration: 6000 });
+      },
     });
-
-    /** Filter out already-claimed items */
-    get availableItems(): BacklogItem[] {
-        const claimedIds = new Set(this.data.existingAssignments.map(a => a.backlogItemId));
-        return this.data.backlogItems.filter(
-            item => !claimedIds.has(item.id) && item.status !== 'Archived'
-        );
-    }
-
-    onClaim(): void {
-        if (this.form.invalid) return;
-        const hours = this.form.value.plannedHours!;
-
-        if (hours % 0.5 !== 0) {
-            this.snackBar.open('Hours must be in 0.5 increments (e.g. 1.5, 2.0)', 'Dismiss', { duration: 5000 });
-            return;
-        }
-
-        this.isLoading.set(true);
-        this.assignmentService.claim({
-            cycleMemberId: this.data.cycleMemberId,
-            backlogItemId: this.form.value.backlogItemId!,
-            plannedHours: hours,
-        }).subscribe({
-            next: (assignment) => {
-                this.snackBar.open('Task claimed!', 'Close', { duration: 3000 });
-                this.dialogRef.close(assignment);
-            },
-            error: (err) => {
-                this.isLoading.set(false);
-                const msg = err?.error?.message ?? 'Failed to claim task.';
-                this.snackBar.open(msg, 'Dismiss', { duration: 6000 });
-            },
-        });
-    }
+  }
 }
