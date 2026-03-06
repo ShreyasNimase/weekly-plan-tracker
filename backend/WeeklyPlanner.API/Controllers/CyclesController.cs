@@ -45,7 +45,7 @@ public class CyclesController : ControllerBase
             return NotFound(new { message = error });
         if (error != null)
             return BadRequest(new { message = error });
-        return Ok(result);
+        return Ok(new { success = true, message = "Cycle setup saved.", data = result });
     }
 
     /// <summary>Opens planning (SETUP → PLANNING).</summary>
@@ -63,7 +63,7 @@ public class CyclesController : ControllerBase
             return NotFound(new { message = error });
         if (error != null)
             return BadRequest(new { message = error });
-        return Ok(result);
+        return Ok(new { success = true, message = "Planning is open!", data = result });
     }
 
     /// <summary>Gets the active cycle (state SETUP, PLANNING, or FROZEN). Returns 204 if none.</summary>

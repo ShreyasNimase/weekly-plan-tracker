@@ -98,9 +98,11 @@
   &.cat-client {
     border-top-color: var(--cat-client);
   }
+
   &.cat-techdebt {
     border-top-color: var(--cat-tech);
   }
+
   &.cat-rnd {
     border-top-color: var(--cat-rd);
   }
@@ -184,4 +186,67 @@
   .pct-row {
     grid-template-columns: 1fr;
   }
+}
+
+/* ── Preset quick-split buttons ────────────────────────────────────────────── */
+.preset-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.preset-label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.preset-btn {
+  font-size: 0.8rem;
+  padding: 0 12px;
+  height: 32px;
+  min-width: 0;
+  line-height: 32px;
+}
+
+/* ── Member summary chip ───────────────────────────────────────────────────── */
+.member-summary-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 0.88rem;
+
+  mat-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+  }
+
+  &.info-chip {
+    background: var(--info-light, rgba(59, 130, 246, 0.1));
+    color: var(--info, #3b82f6);
+  }
+
+  &.warning-chip {
+    background: var(--warning-light, rgba(245, 158, 11, 0.12));
+    color: var(--warning, #d97706);
+  }
+}
+
+/* ── pct-total warn (zero-category) ───────────────────────────────────────── */
+.pct-total.warn {
+  color: var(--warning, #d97706);
+}
+
+/* ── muted inline text ─────────────────────────────────────────────────────── */
+.muted {
+  color: var(--text-muted);
+  font-weight: 400;
+  font-size: 0.83em;
 }

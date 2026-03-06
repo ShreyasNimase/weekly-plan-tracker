@@ -1,66 +1,237 @@
 <div class="page-wrapper">
-  <!-- User greeting -->
+
+  <!-- ══ LOADING STATE ══ -->
+  @if (isLoading()) {
+  <div class="flex-center" style="padding: 64px 0;">
+    <mat-spinner diameter="48"></mat-spinner>
+  </div>
+  } @else {
+
+  <!-- ══ GREETING ══ -->
   <div class="home-greeting">
-    <div class="greeting-avatar">{{ (currentUser()?.name ?? 'P').charAt(0).toUpperCase() }}</div>
+    <div class="greeting-avatar">
+      {{ (currentUser()?.name ?? 'P').charAt(0).toUpperCase() }}
+    </div>
     <div>
-      <h1>Good to see you, {{ (currentUser()?.name ?? 'Planner').split(' ')[0] }}!</h1>
-      <p>
+      <h1>Hi, {{ firstName }}!</h1>
+      <div class="greeting-badges">
         @if (isLead) {
-          <span class="role-badge lead">Team Lead</span>
+        <span class="role-badge lead">Team Lead</span>
+        } @else {
+        <span class="role-badge member">Team Member</span>
         }
-        @if (!isLead) {
-          <span class="role-badge member">Team Member</span>
-        }
-      </p>
+      </div>
     </div>
   </div>
 
-  @if (isLoading()) {
-    <div class="flex-center mt-6">
-      <mat-spinner diameter="48"></mat-spinner>
-    </div>
-  } @else {
-
-    <!-- Active Cycle status bar -->
-    @if (hasCycle) {
-      <div class="banner info cycle-status-bar" [class]="'cycle-' + cycleStatus.toLowerCase()">
-        <mat-icon class="cycle-icon">
-          {{ cycleStatus === 'Planning' ? 'lock_open' : cycleStatus === 'Frozen' ? 'lock' : 'settings' }}
-        </mat-icon>
-        <div class="cycle-text">
-          <strong>Active Cycle</strong>
-          — Week of {{ activeCycle()!.weekStartDate }}
-          <span class="cycle-badge">{{ cycleStatus }}</span>
-        </div>
-      </div>
-    }
-
-    <!-- Info banner -->
-    @if (infoBanner) {
-      <div class="banner" [class]="infoBanner.type">
-        <mat-icon>
-          {{ infoBanner.type === 'success' ? 'check_circle_outline' : infoBanner.type === 'warn' ? 'info' : 'info_outline' }}
-        </mat-icon>
-        <span>{{ infoBanner.text }}</span>
-      </div>
-    }
-
-    <!-- Section label -->
-    <p class="section-label">What do you want to do?</p>
-
-    <!-- Action cards grid -->
-    <div class="cards-grid">
-      @for (card of cards; track card.title) {
-        <div class="action-card" [class.danger-card]="card.danger"
-             (click)="navigate(card)" role="button"
-             [attr.aria-label]="card.title">
-          <div class="action-icon" [class.danger]="card.danger">
-            <mat-icon>{{ card.icon }}</mat-icon>
-          </div>
-          <div class="card-title">{{ card.title }}</div>
-          <div class="card-subtitle">{{ card.desc }}</div>
-        </div>
-      }
-    </div>
+  <!-- ══ CYCLE STATUS CARD (when cycle exists) ══ -->
+  @if (hasCycle) {
+  <app-cycle-status-card [cycle]="activeCycle()!" [isLead]="isLead" [completedHours]="0" (setupClick)="goToSetup()"
+    (cancelSetupClick)="confirmCancelSetup()" (freezeReviewClick)="goToFreezeReview()"
+    (cancelPlanningClick)="confirmCancelPlanning()" (dashboardClick)="goToDashboard()"
+    (finishWeekClick)="confirmFinishWeek()">
+  </app-cycle-status-card>
   }
-</div>
+
+  <!-- ══ BANNERS ══ -->
+
+  @if (isLead && !hasCycle) {
+  <div class="banner info">
+    <mat-icon>info_outline</mat-icon>
+    <span>No active week yet. Click <strong>Start a New Week</strong> to begin!</span>
+  </div>
+  }
+
+  @if (isLead && cycleState === 'PLANNING') {
+  <div class="banner success">
+    <mat-icon>check_circle_outline</mat-icon>
+    <span>✓ Planning is open! Team members can now pick their work.</span>
+  </div>
+  }
+
+  @if (!isLead && (!hasCycle || !isParticipating)) {
+  <div class="banner info">
+    <mat-icon>info_outline</mat-icon>
+    <span>There's no active plan for you right now. Check back when the Team Lead opens planning.</span>
+  </div>
+  }
+
+  @if (!isLead && cycleState === 'PLANNING' && isParticipating) {
+  <div class="banner success">
+    <mat-icon>check_circle_outline</mat-icon>
+    <span>✓ Planning is open! Pick your work items for this week.</span>
+  </div>
+  }
+
+  <!-- ══ ACTION CARDS ══ -->
+  <p class="section-label" style="margin-top: 8px;">What do you want to do?</p>
+
+  <div class="cards-grid">
+
+    <!-- ════ LEAD — No cycle ════ -->
+    @if (isLead && !hasCycle) {
+    <div class="action-card" (click)="startNewWeek()" role="button">
+      <div class="action-icon primary">
+        <mat-icon>rocket_launch</mat-icon>
+      </div>
+      <div class="card-title">Start a New Week</div>
+      <div class="card-subtitle">Create a new planning cycle</div>
+    </div>
+    }
+
+    <!-- ════ LEAD — SETUP ════ -->
+    @if (isLead && cycleState === 'SETUP') {
+    <div class="action-card primary-card" (click)="goToSetup()" role="button">
+      <div class="action-icon primary">
+        <mat-icon>settings</mat-icon>
+      </div>
+      <div class="card-title">Set Up This Week's Plan</div>
+      <div class="card-subtitle">Choose members and set hour budgets</div>
+    </div>
+    }
+
+    <!-- ════ LEAD — PLANNING ════ -->
+    @if (isLead && cycleState === 'PLANNING') {
+    <div class="action-card primary-card" (click)="goToFreezeReview()" role="button">
+      <div class="action-icon primary">
+        <mat-icon>ac_unit</mat-icon>
+      </div>
+      <div class="card-title">Review &amp; Freeze the Plan</div>
+      <div class="card-subtitle">Check all hours and lock the plan</div>
+    </div>
+    @if (isParticipating) {
+    <div class="action-card" (click)="goToPlanning()" role="button">
+      <div class="action-icon">
+        <mat-icon>edit_note</mat-icon>
+      </div>
+      <div class="card-title">Plan My Work</div>
+      <div class="card-subtitle">Pick your work items for this week</div>
+    </div>
+    }
+    }
+
+    <!-- ════ LEAD — FROZEN ════ -->
+    @if (isLead && cycleState === 'FROZEN') {
+    <div class="action-card primary-card" (click)="goToDashboard()" role="button">
+      <div class="action-icon success">
+        <mat-icon>bar_chart</mat-icon>
+      </div>
+      <div class="card-title">See Team Progress</div>
+      <div class="card-subtitle">View everyone's progress this week</div>
+    </div>
+    @if (isParticipating) {
+    <div class="action-card" (click)="goToProgress()" role="button">
+      <div class="action-icon">
+        <mat-icon>update</mat-icon>
+      </div>
+      <div class="card-title">Update My Progress</div>
+      <div class="card-subtitle">Report hours on your tasks</div>
+    </div>
+    }
+    <div class="action-card" (click)="confirmFinishWeek()" role="button">
+      <div class="action-icon success">
+        <mat-icon>task_alt</mat-icon>
+      </div>
+      <div class="card-title">Finish This Week</div>
+      <div class="card-subtitle">Close out the cycle and archive tasks</div>
+    </div>
+    }
+
+    <!-- ════ LEAD — shared cards (always visible for lead) ════ -->
+    @if (isLead) {
+    <div class="action-card" (click)="goToBacklog()" role="button">
+      <div class="action-icon">
+        <mat-icon>format_list_bulleted</mat-icon>
+      </div>
+      <div class="card-title">Manage Backlog</div>
+      <div class="card-subtitle">Add and manage work items</div>
+    </div>
+    <div class="action-card" (click)="goToTeam()" role="button">
+      <div class="action-icon">
+        <mat-icon>group</mat-icon>
+      </div>
+      <div class="card-title">Manage Team</div>
+      <div class="card-subtitle">Add or update team members</div>
+    </div>
+    <div class="action-card" (click)="goToPastCycles()" role="button">
+      <div class="action-icon muted">
+        <mat-icon>history</mat-icon>
+      </div>
+      <div class="card-title">View Past Weeks</div>
+      <div class="card-subtitle">See completed planning cycles</div>
+    </div>
+    }
+
+    <!-- ════ MEMBER — No cycle or not participating ════ -->
+    @if (!isLead && (!hasCycle || !isParticipating)) {
+    <div class="action-card" (click)="goToBacklog()" role="button">
+      <div class="action-icon">
+        <mat-icon>format_list_bulleted</mat-icon>
+      </div>
+      <div class="card-title">Manage Backlog</div>
+      <div class="card-subtitle">View and manage work items</div>
+    </div>
+    <div class="action-card" (click)="goToPastCycles()" role="button">
+      <div class="action-icon muted">
+        <mat-icon>history</mat-icon>
+      </div>
+      <div class="card-title">View Past Weeks</div>
+      <div class="card-subtitle">See completed planning cycles</div>
+    </div>
+    }
+
+    <!-- ════ MEMBER — PLANNING ════ -->
+    @if (!isLead && cycleState === 'PLANNING' && isParticipating) {
+    <div class="action-card primary-card" (click)="goToPlanning()" role="button">
+      <div class="action-icon primary">
+        <mat-icon>edit_note</mat-icon>
+      </div>
+      <div class="card-title">Plan My Work</div>
+      <div class="card-subtitle">Pick backlog items and commit hours</div>
+    </div>
+    <div class="action-card" (click)="goToBacklog()" role="button">
+      <div class="action-icon">
+        <mat-icon>format_list_bulleted</mat-icon>
+      </div>
+      <div class="card-title">Manage Backlog</div>
+      <div class="card-subtitle">View and manage work items</div>
+    </div>
+    <div class="action-card" (click)="goToPastCycles()" role="button">
+      <div class="action-icon muted">
+        <mat-icon>history</mat-icon>
+      </div>
+      <div class="card-title">View Past Weeks</div>
+      <div class="card-subtitle">See completed planning cycles</div>
+    </div>
+    }
+
+    <!-- ════ MEMBER — FROZEN ════ -->
+    @if (!isLead && cycleState === 'FROZEN' && isParticipating) {
+    <div class="action-card primary-card" (click)="goToProgress()" role="button">
+      <div class="action-icon primary">
+        <mat-icon>update</mat-icon>
+      </div>
+      <div class="card-title">Update My Progress</div>
+      <div class="card-subtitle">Report hours and status on your tasks</div>
+    </div>
+    <div class="action-card" (click)="goToDashboard()" role="button">
+      <div class="action-icon success">
+        <mat-icon>bar_chart</mat-icon>
+      </div>
+      <div class="card-title">See Team Progress</div>
+      <div class="card-subtitle">See how the team is doing</div>
+    </div>
+    <div class="action-card" (click)="goToPastCycles()" role="button">
+      <div class="action-icon muted">
+        <mat-icon>history</mat-icon>
+      </div>
+      <div class="card-title">View Past Weeks</div>
+      <div class="card-subtitle">See completed planning cycles</div>
+    </div>
+    }
+
+  </div><!-- end cards-grid -->
+
+  }<!-- end @else (not loading) -->
+
+</div><!-- end page-wrapper -->

@@ -72,17 +72,71 @@
   margin-top: 24px;
 }
 
-.freeze-btn,
-.cancel-plan-btn {
+/* ── Sticky freeze action bar ──────────────────────────────────────────────── */
+.freeze-action-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  background: var(--bg, #fff);
+  border-top: 1px solid var(--border);
+  padding: 16px 0 8px;
+  margin-top: 24px;
+}
+
+.freeze-validation {
+  margin-bottom: 12px;
+}
+
+.freeze-buttons {
   display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
-  height: 48px;
-  font-weight: 600;
+}
+
+.freeze-btn {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  height: 44px !important;
+  font-weight: 700 !important;
+  font-size: 0.95rem !important;
+  border-radius: 10px !important;
+  padding: 0 24px !important;
 
   mat-icon {
     font-size: 20px;
     width: 20px;
     height: 20px;
   }
+}
+
+.cancel-planning-btn {
+  border: 1.5px solid var(--danger, #ef4444) !important;
+  color: var(--danger, #ef4444) !important;
+  height: 44px !important;
+  border-radius: 10px !important;
+  font-weight: 600 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  padding: 0 20px !important;
+  cursor: pointer !important;
+  background: transparent !important;
+  transition: background 0.15s !important;
+
+  &:hover:not([disabled]) {
+    background: var(--danger-light, rgba(239, 68, 68, 0.08)) !important;
+  }
+
+  mat-icon {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+  }
+}
+
+/* Legacy selector kept for safety */
+.cancel-plan-btn {
+  @extend .cancel-planning-btn;
 }

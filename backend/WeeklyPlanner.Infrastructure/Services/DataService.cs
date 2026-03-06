@@ -192,36 +192,55 @@ public class DataService : IDataService
 
     public async Task SeedAsync(CancellationToken cancellationToken = default)
     {
-        var alice = new TeamMember { Name = "Alice Chen", IsLead = true, IsActive = true };
-        var bob = new TeamMember { Name = "Bob Martinez", IsLead = false, IsActive = true };
-        var carol = new TeamMember { Name = "Carol Singh", IsLead = false, IsActive = true };
-        var dave = new TeamMember { Name = "Dave Kim", IsLead = false, IsActive = true };
-        _context.TeamMembers.AddRange(alice, bob, carol, dave);
-        await _context.SaveChangesAsync(cancellationToken);
-
-        var backlogItems = new List<BacklogItem>
+        var strategy = _context.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
         {
-            new() { Title = "Customer onboarding redesign", Description = "Revamp the onboarding flow for new customers.", Category = "CLIENT_FOCUSED", Status = "AVAILABLE", EstimatedEffort = 12m, CreatedBy = alice.Id },
-            new() { Title = "Fix billing invoice formatting", Description = "Some invoices show wrong currency format.", Category = "CLIENT_FOCUSED", Status = "AVAILABLE", EstimatedEffort = 4m, CreatedBy = alice.Id },
-            new() { Title = "Customer feedback dashboard", Description = "Build a dashboard showing NPS scores.", Category = "CLIENT_FOCUSED", Status = "AVAILABLE", EstimatedEffort = 16m, CreatedBy = alice.Id },
-            new() { Title = "Migrate database to PostgreSQL 16", Description = "Upgrade from PG 14 to PG 16.", Category = "TECH_DEBT", Status = "AVAILABLE", EstimatedEffort = 20m, CreatedBy = alice.Id },
-            new() { Title = "Remove deprecated API endpoints", Description = "Clean up v1 API routes.", Category = "TECH_DEBT", Status = "AVAILABLE", EstimatedEffort = 8m, CreatedBy = alice.Id },
-            new() { Title = "Add unit tests for payment module", Description = "Coverage is below 50%.", Category = "TECH_DEBT", Status = "AVAILABLE", EstimatedEffort = 10m, CreatedBy = alice.Id },
-            new() { Title = "Experiment with LLM-based search", Description = "Prototype semantic search using embeddings.", Category = "R_AND_D", Status = "AVAILABLE", EstimatedEffort = 15m, CreatedBy = alice.Id },
-            new() { Title = "Evaluate new caching strategy", Description = "Compare Redis Cluster vs Memcached.", Category = "R_AND_D", Status = "AVAILABLE", EstimatedEffort = 6m, CreatedBy = alice.Id },
-            new() { Title = "Build internal CLI tool", Description = "A command-line tool for common dev tasks.", Category = "R_AND_D", Status = "AVAILABLE", EstimatedEffort = 8m, CreatedBy = alice.Id },
-            new() { Title = "Client SSO integration", Description = "Support SAML-based single sign-on for enterprise clients.", Category = "CLIENT_FOCUSED", Status = "AVAILABLE", EstimatedEffort = 18m, CreatedBy = alice.Id }
-        };
-        _context.BacklogItems.AddRange(backlogItems);
-        await _context.SaveChangesAsync(cancellationToken);
+            await using var tx = await _context.Database.BeginTransactionAsync(cancellationToken);
+            try
+            {
+                // 1. Delete ALL existing data in FK-safe order
+                await _context.ProgressUpdates.ExecuteDeleteAsync(cancellationToken);
+                await _context.TaskAssignments.ExecuteDeleteAsync(cancellationToken);
+                await _context.MemberPlans.ExecuteDeleteAsync(cancellationToken);
+                await _context.CategoryAllocations.ExecuteDeleteAsync(cancellationToken);
+                await _context.CycleMembers.ExecuteDeleteAsync(cancellationToken);
+                await _context.PlanningCycles.ExecuteDeleteAsync(cancellationToken);
+                await _context.BacklogItems.ExecuteDeleteAsync(cancellationToken);
+                await _context.TeamMembers.ExecuteDeleteAsync(cancellationToken);
 
-        // Reset cycle-related data only
-        await _context.ProgressUpdates.ExecuteDeleteAsync(cancellationToken);
-        await _context.TaskAssignments.ExecuteDeleteAsync(cancellationToken);
-        await _context.MemberPlans.ExecuteDeleteAsync(cancellationToken);
-        await _context.CategoryAllocations.ExecuteDeleteAsync(cancellationToken);
-        await _context.CycleMembers.ExecuteDeleteAsync(cancellationToken);
-        await _context.PlanningCycles.ExecuteDeleteAsync(cancellationToken);
+                // 2. Insert fresh team members — Alice is the ONLY lead
+                var alice = new TeamMember { Id = Guid.NewGuid(), Name = "Alice Chen", IsLead = true, IsActive = true, CreatedAt = DateTime.UtcNow };
+                var bob = new TeamMember { Id = Guid.NewGuid(), Name = "Bob Martinez", IsLead = false, IsActive = true, CreatedAt = DateTime.UtcNow };
+                var carol = new TeamMember { Id = Guid.NewGuid(), Name = "Carol Singh", IsLead = false, IsActive = true, CreatedAt = DateTime.UtcNow };
+                var dave = new TeamMember { Id = Guid.NewGuid(), Name = "Dave Kim", IsLead = false, IsActive = true, CreatedAt = DateTime.UtcNow };
+                _context.TeamMembers.AddRange(alice, bob, carol, dave);
+                await _context.SaveChangesAsync(cancellationToken);
+
+                // 3. Insert fresh backlog items — all created by Alice
+                var backlogItems = new List<BacklogItem>
+                {
+                    new() { Title = "Customer onboarding redesign", Description = "Revamp the onboarding flow for new customers.", Category = "CLIENT_FOCUSED", Status = "AVAILABLE", EstimatedEffort = 12m, CreatedBy = alice.Id, CreatedAt = DateTime.UtcNow },
+                    new() { Title = "Fix billing invoice formatting", Description = "Some invoices show wrong currency format.", Category = "CLIENT_FOCUSED", Status = "AVAILABLE", EstimatedEffort = 4m, CreatedBy = alice.Id, CreatedAt = DateTime.UtcNow },
+                    new() { Title = "Customer feedback dashboard", Description = "Build a dashboard showing NPS scores.", Category = "CLIENT_FOCUSED", Status = "AVAILABLE", EstimatedEffort = 16m, CreatedBy = alice.Id, CreatedAt = DateTime.UtcNow },
+                    new() { Title = "Migrate database to PostgreSQL 16", Description = "Upgrade from PG 14 to PG 16.", Category = "TECH_DEBT", Status = "AVAILABLE", EstimatedEffort = 20m, CreatedBy = alice.Id, CreatedAt = DateTime.UtcNow },
+                    new() { Title = "Remove deprecated API endpoints", Description = "Clean up v1 API routes.", Category = "TECH_DEBT", Status = "AVAILABLE", EstimatedEffort = 8m, CreatedBy = alice.Id, CreatedAt = DateTime.UtcNow },
+                    new() { Title = "Add unit tests for payment module", Description = "Coverage is below 50%.", Category = "TECH_DEBT", Status = "AVAILABLE", EstimatedEffort = 10m, CreatedBy = alice.Id, CreatedAt = DateTime.UtcNow },
+                    new() { Title = "Experiment with LLM-based search", Description = "Prototype semantic search using embeddings.", Category = "R_AND_D", Status = "AVAILABLE", EstimatedEffort = 15m, CreatedBy = alice.Id, CreatedAt = DateTime.UtcNow },
+                    new() { Title = "Evaluate new caching strategy", Description = "Compare Redis Cluster vs Memcached.", Category = "R_AND_D", Status = "AVAILABLE", EstimatedEffort = 6m, CreatedBy = alice.Id, CreatedAt = DateTime.UtcNow },
+                    new() { Title = "Build internal CLI tool", Description = "A command-line tool for common dev tasks.", Category = "R_AND_D", Status = "AVAILABLE", EstimatedEffort = 8m, CreatedBy = alice.Id, CreatedAt = DateTime.UtcNow },
+                    new() { Title = "Client SSO integration", Description = "Support SAML-based single sign-on for enterprise clients.", Category = "CLIENT_FOCUSED", Status = "AVAILABLE", EstimatedEffort = 18m, CreatedBy = alice.Id, CreatedAt = DateTime.UtcNow },
+                };
+                _context.BacklogItems.AddRange(backlogItems);
+                await _context.SaveChangesAsync(cancellationToken);
+
+                await tx.CommitAsync(cancellationToken);
+            }
+            catch
+            {
+                await tx.RollbackAsync(cancellationToken);
+                throw;
+            }
+        });
     }
 
     public async Task ResetAsync(CancellationToken cancellationToken = default)

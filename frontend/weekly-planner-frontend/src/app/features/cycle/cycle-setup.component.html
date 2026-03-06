@@ -10,116 +10,210 @@
   </div>
 
   @if (isLoading()) {
-    <div class="flex-center" style="padding: 64px 0;"><mat-spinner diameter="52"></mat-spinner></div>
+  <div class="flex-center" style="padding: 64px 0;"><mat-spinner diameter="52"></mat-spinner></div>
   } @else {
-    <form [formGroup]="form" class="setup-wrapper">
-      <div class="wpt-card section-card">
-        <p class="section-label">Planning Date</p>
-        <p class="section-desc">Must be a Tuesday — this is when the work week begins.</p>
-        <mat-form-field appearance="outline" class="date-field">
-          <mat-label>Pick a Tuesday</mat-label>
-          <input matInput [matDatepicker]="picker" formControlName="weekStartDate" placeholder="dd/MM/yyyy" />
-          <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
-          <mat-datepicker #picker></mat-datepicker>
-          @if (form.controls.weekStartDate.hasError('mustBeTuesday') && form.controls.weekStartDate.touched) {
-            <mat-error>Planning must start on a Tuesday.</mat-error>
+  <form [formGroup]="form" class="setup-wrapper">
+
+    <!-- ═══════════════════════════════════════════════════ -->
+    <!-- SECTION 1: Planning Date                           -->
+    <!-- ═══════════════════════════════════════════════════ -->
+    <div class="wpt-card section-card">
+      <p class="section-label">Planning Date</p>
+      <p class="section-desc">Must be a Tuesday — this is when the work week begins.</p>
+
+      <mat-form-field appearance="outline" class="date-field">
+        <mat-label>Pick a Tuesday</mat-label>
+        <input matInput [matDatepicker]="picker" formControlName="weekStartDate" placeholder="dd/MM/yyyy" />
+        <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
+        <mat-datepicker #picker></mat-datepicker>
+
+        @if (form.controls.weekStartDate.hasError('required') && form.controls.weekStartDate.touched) {
+        <mat-error>Please select a planning date.</mat-error>
+        }
+        @if (form.controls.weekStartDate.hasError('notTuesday') && form.controls.weekStartDate.touched) {
+        <mat-error>
+          {{ formatDisplay(form.get('planningDate')?.value ?? form.controls.weekStartDate.value) }}
+          is not a Tuesday. Please pick a Tuesday.
+        </mat-error>
+        }
+      </mat-form-field>
+
+      <!-- BUG 1 FIX: "Work period:" label is ONLY here — getWorkStart/End return Date objects -->
+      @if (isValidTuesday(form.controls.weekStartDate.value)) {
+      <div class="work-period-chip">
+        <mat-icon>event_available</mat-icon>
+        <span>
+          Work period:
+          <strong>{{ getWorkStart() | date:'dd-MM-yyyy' }}</strong>
+          to
+          <strong>{{ getWorkEnd() | date:'dd-MM-yyyy' }}</strong>
+          <span class="muted"> (Wed – Mon, 4 working days)</span>
+        </span>
+      </div>
+      }
+
+      <!-- Warning when a non-Tuesday is selected -->
+      @if (form.controls.weekStartDate.value
+      && !isValidTuesday(form.controls.weekStartDate.value)
+      && !form.controls.weekStartDate.hasError('required')) {
+      <div class="banner warning" style="margin-top: 12px;">
+        <mat-icon>event_busy</mat-icon>
+        <span>
+          Planning must start on a Tuesday.
+          The selected date is a <strong>{{ getDayName(form.controls.weekStartDate.value) }}</strong>.
+        </span>
+      </div>
+      }
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════ -->
+    <!-- SECTION 2: Team Members                            -->
+    <!-- BUG 4 FIX: always-visible summary + warning       -->
+    <!-- ═══════════════════════════════════════════════════ -->
+    <div class="wpt-card section-card">
+      <p class="section-label">Team Members</p>
+      <p class="section-desc">Select who is working this week.</p>
+
+      <div class="member-list">
+        @for (member of allMembers(); track member.id) {
+        <div class="member-row item-row">
+          <mat-checkbox [checked]="isMemberChecked(member.id)" (change)="toggleMember(member.id)" color="primary">
+            <span class="member-name">{{ member.name }}</span>
+          </mat-checkbox>
+          @if (member.isLead) {
+          <span class="role-badge lead">Team Lead</span>
           }
-          @if (form.controls.weekStartDate.hasError('required') && form.controls.weekStartDate.touched) {
-            <mat-error>Please pick a date.</mat-error>
+        </div>
+        }
+        @if (allMembers().length === 0) {
+        <p class="text-muted">No active team members found.</p>
+        }
+      </div>
+
+      <!-- Always-visible summary line -->
+      <div class="member-summary-chip" [ngClass]="selectedCount === 0 ? 'warning-chip' : 'info-chip'">
+        @if (selectedCount === 0) {
+        <mat-icon>warning</mat-icon>
+        <span>No members selected. Select at least one person.</span>
+        } @else {
+        <mat-icon>people</mat-icon>
+        <span>
+          <strong>{{ selectedCount }}</strong>
+          member{{ selectedCount > 1 ? 's' : '' }} selected ·
+          <strong>{{ totalHours }}h</strong> total capacity
+        </span>
+        }
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════ -->
+    <!-- SECTION 3: Category Split                          -->
+    <!-- BUG 2 FIX: min 1% each; BUG 5 FIX: presets       -->
+    <!-- ═══════════════════════════════════════════════════ -->
+    <div class="wpt-card section-card">
+      <p class="section-label">Category Split</p>
+      <p class="section-desc">
+        Percentages must add up to exactly 100%.
+        Each category needs at least 1% so team members can pick items from it.
+      </p>
+
+      <!-- Quick preset buttons (BUG 5) -->
+      <div class="preset-row">
+        <span class="preset-label">Quick splits:</span>
+        <button mat-stroked-button class="preset-btn" type="button" (click)="setPreset(50, 30, 20)">50 / 30 /
+          20</button>
+        <button mat-stroked-button class="preset-btn" type="button" (click)="setPreset(40, 40, 20)">40 / 40 /
+          20</button>
+        <button mat-stroked-button class="preset-btn" type="button" (click)="setPreset(33, 33, 34)">33 / 33 /
+          34</button>
+      </div>
+
+      <div class="pct-row">
+        @for (cat of catConfig; track cat.value; let i = $index) {
+        <mat-form-field appearance="outline" class="pct-field">
+          <mat-label>
+            {{ cat.label }} %
+          </mat-label>
+          <input matInput type="number" min="1" max="98" step="1" [formControlName]="'pct' + i" />
+          @if (catHours[i] > 0 && selectedCount > 0) {
+          <mat-hint>= {{ catHours[i] }}h</mat-hint>
+          }
+          @if (form.get('pct' + i)?.hasError('min')) {
+          <mat-error>Minimum 1%</mat-error>
           }
         </mat-form-field>
-        @if (workPeriod) {
-          <div class="work-period-chip">
-            <mat-icon>info</mat-icon>
-            Work period: {{ workPeriod }}
-          </div>
         }
       </div>
 
-      <div class="wpt-card section-card">
-        <p class="section-label">Team Members</p>
-        <p class="section-desc">Select who is working this week.</p>
-        <div class="member-list">
-          @for (member of allMembers(); track member.id) {
-            <div class="member-row item-row">
-              <mat-checkbox [checked]="isMemberChecked(member.id)" (change)="toggleMember(member.id)" color="primary">
-                <span class="member-name">{{ member.name }}</span>
-              </mat-checkbox>
-              @if (member.isLead) {
-                <span class="role-badge lead">Team Lead</span>
-              }
-            </div>
-          }
-          @if (allMembers().length === 0) {
-            <p class="text-muted">No active team members found.</p>
-          }
+      <!-- BUG 2 FIX: three-state total display -->
+      <p class="pct-total" [class.ok]="getPctStatus() === 'valid'" [class.err]="getPctStatus() !== 'valid'"
+        [class.warn]="getPctStatus() === 'zero-category'">
+        @if (getPctStatus() === 'valid') {
+        <mat-icon>check_circle</mat-icon>
+        Total: 100% ✓
+        } @else if (getPctStatus() === 'zero-category') {
+        <mat-icon>warning</mat-icon>
+        Each category must have at least 1%. Zero budget prevents team members from picking those items.
+        } @else {
+        <mat-icon>cancel</mat-icon>
+        Total: {{ pctSum() }}% — must equal 100%
+        }
+      </p>
+
+      <!-- Budget preview — only shown when valid + members selected -->
+      @if (getPctStatus() === 'valid' && selectedCount > 0) {
+      <div class="budget-cards-row">
+        @for (cat of catConfig; track cat.value; let i = $index) {
+        <div class="budget-card" [ngClass]="cat.cls">
+          <span class="budget-label">{{ cat.label }}</span>
+          <span class="budget-hours">{{ catHours[i] }}h</span>
         </div>
-        <p class="hours-summary">
-          <strong>{{ selectedCount }}</strong> members selected · <strong>{{ totalHours }}h</strong> total
-        </p>
+        }
+      </div>
+      }
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════ -->
+    <!-- ACTION: Submit button                              -->
+    <!-- ═══════════════════════════════════════════════════ -->
+    <div class="action-row">
+      <button mat-flat-button class="btn-primary open-btn" [disabled]="!canSubmit" (click)="onOpenPlanning()">
+        @if (isSubmitting()) {
+        <mat-spinner diameter="20"></mat-spinner>
+        Opening…
+        } @else {
+        <mat-icon>lock_open</mat-icon>
+        Open Planning for the Team
+        }
+      </button>
+
+      <!-- Inline validation hints -->
+      @if (!canSubmit && !isSubmitting()) {
+      <div class="hint-list">
+        @if (form.controls.weekStartDate.invalid) {
+        <span class="hint-item">• Pick a valid Tuesday date</span>
+        }
         @if (selectedCount === 0) {
-          <div class="banner danger" style="margin-top: 12px;">
-            <mat-icon>warning</mat-icon>
-            <span>At least one member must be selected.</span>
-          </div>
+        <span class="hint-item">• Select at least one team member</span>
+        }
+        @if (getPctStatus() === 'wrong-total') {
+        <span class="hint-item">• Category percentages must total 100% (currently {{ pctSum() }}%)</span>
+        }
+        @if (getPctStatus() === 'zero-category') {
+        <span class="hint-item">• Each category must have at least 1%</span>
         }
       </div>
+      }
 
-      <div class="wpt-card section-card">
-        <p class="section-label">Category Split</p>
-        <p class="section-desc">Percentages must add up to 100%.</p>
-        <div class="pct-row">
-          @for (cat of catConfig; track cat.value; let i = $index) {
-            <mat-form-field appearance="outline" class="pct-field">
-              <mat-label>{{ cat.label }} %</mat-label>
-              <input matInput type="number" min="0" max="100" step="1" [formControlName]="'pct' + i" />
-            </mat-form-field>
-          }
-        </div>
-        @if (selectedCount > 0) {
-          <div class="budget-cards-row">
-            @for (cat of catConfig; track cat.value; let i = $index) {
-              <div class="budget-card" [ngClass]="cat.cls">
-                <span class="budget-label">{{ cat.label }}</span>
-                <span class="budget-hours">{{ catHours[i] }}h</span>
-              </div>
-            }
-          </div>
-        }
-        <p class="pct-total" [class.ok]="pctOk" [class.err]="!pctOk">
-          @if (pctOk) {
-            <mat-icon>check_circle</mat-icon>
-            Total: 100%
-          } @else {
-            Total: {{ pctTotal }}% — must be exactly 100%
-          }
-        </p>
+      <!-- Inline submit error -->
+      @if (submitError()) {
+      <div class="banner danger">
+        <mat-icon>error_outline</mat-icon>
+        {{ submitError() }}
       </div>
+      }
+    </div>
 
-      <div class="action-row">
-        <button mat-flat-button class="btn-primary open-btn" [disabled]="!canSubmit" (click)="onOpenPlanning()">
-          @if (isSubmitting()) {
-            <mat-spinner diameter="20"></mat-spinner>
-            Opening planning…
-          } @else {
-            <mat-icon>lock_open</mat-icon>
-            Open Planning for the Team
-          }
-        </button>
-        @if (!canSubmit && !isSubmitting()) {
-          <div class="hint-list">
-            @if (form.controls.weekStartDate.invalid) {
-              <span class="hint-item">• Pick a valid Tuesday date</span>
-            }
-            @if (selectedCount === 0) {
-              <span class="hint-item">• Select at least one team member</span>
-            }
-            @if (!pctOk) {
-              <span class="hint-item">• Category percentages must total 100% (currently {{ pctTotal }}%)</span>
-            }
-          </div>
-        }
-      </div>
-    </form>
+  </form>
   }
 </div>

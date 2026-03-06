@@ -6,7 +6,7 @@ import {
   ReactiveFormsModule, FormBuilder, Validators,
   AbstractControl, ValidationErrors
 } from '@angular/forms';
-import { DatePipe } from '@angular/common';
+import { DatePipe, NgClass, NgIf, NgFor } from '@angular/common';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -18,25 +18,14 @@ import { MatDividerModule } from '@angular/material/divider';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatDialogModule, MatDialog } from '@angular/material/dialog';
 import { MatDatepickerModule } from '@angular/material/datepicker';
-import { MatNativeDateModule, MAT_DATE_FORMATS, MAT_DATE_LOCALE } from '@angular/material/core';
-import { NgClass } from '@angular/common';
+import { MatNativeDateModule, MAT_DATE_FORMATS } from '@angular/material/core';
 import { CycleService } from '../../core/services/cycle.service';
 import { TeamService } from '../../core/services/team.service';
 import { TeamMember } from '../../shared/models/team-member.model';
 import { Cycle } from '../../shared/models/cycle.model';
-import { BacklogCategory } from '../../shared/enums/status.enum';
-import { switchMap } from 'rxjs';
-import { ConfirmDialogComponent } from '../../shared/dialogs/confirm-dialog.component';
+import { switchMap, of } from 'rxjs';
 
-// ── Custom Tuesday validator ─────────────────────────────────────────────────
-function tuesdayValidator(ctrl: AbstractControl): ValidationErrors | null {
-  const v = ctrl.value;
-  if (!v) return null;
-  const d = v instanceof Date ? v : new Date(v + 'T12:00:00');
-  return d.getDay() === 2 ? null : { mustBeTuesday: true };
-}
-
-// ── Custom date display format (dd-MM-yyyy) ────────────────────────────────────
+// ── Custom date display format (dd/MM/yyyy) ───────────────────────────────────
 const MY_DATE_FORMATS = {
   parse: { dateInput: 'DD/MM/YYYY' },
   display: {
@@ -47,11 +36,11 @@ const MY_DATE_FORMATS = {
   },
 };
 
-// ── Category config ──────────────────────────────────────────────────────────
+// ── Category config ───────────────────────────────────────────────────────────
 export const CAT_CONFIG = [
-  { value: BacklogCategory.Feature, label: 'Client Focused', cls: 'cat-client', defaultPct: 50 },
-  { value: BacklogCategory.TechDebt, label: 'Tech Debt', cls: 'cat-techdebt', defaultPct: 30 },
-  { value: BacklogCategory.Learning, label: 'R&D', cls: 'cat-rnd', defaultPct: 20 },
+  { value: 'CLIENT_FOCUSED', label: 'Client Focused', cls: 'cat-client', defaultPct: 50 },
+  { value: 'TECH_DEBT', label: 'Tech Debt', cls: 'cat-techdebt', defaultPct: 30 },
+  { value: 'R_AND_D', label: 'R&D', cls: 'cat-rnd', defaultPct: 20 },
 ];
 
 @Component({
@@ -60,6 +49,9 @@ export const CAT_CONFIG = [
   imports: [
     RouterLink,
     DatePipe,
+    NgClass,
+    NgIf,
+    NgFor,
     ReactiveFormsModule,
     MatCardModule,
     MatButtonModule,
@@ -73,7 +65,6 @@ export const CAT_CONFIG = [
     MatDialogModule,
     MatDatepickerModule,
     MatNativeDateModule,
-    NgClass,
   ],
   providers: [
     { provide: MAT_DATE_FORMATS, useValue: MY_DATE_FORMATS },
@@ -93,63 +84,149 @@ export class CycleSetupComponent implements OnInit {
   readonly isLoading = signal(true);
   readonly isSubmitting = signal(false);
   readonly activeCycle = signal<Cycle | null>(null);
+  readonly submitError = signal<string | null>(null);
 
-  // Which members are currently checked (set of IDs)
+  /** Which members are currently checked (set of IDs) */
   readonly checkedIds = signal<Set<string>>(new Set());
 
-  // Category config exposed to template
+  /** Category config exposed to template */
   readonly catConfig = CAT_CONFIG;
 
-  // ── Main form ──────────────────────────────────────────────────────────────
+  // ── Main form ─────────────────────────────────────────────────────────────
   readonly form = this.fb.group({
-    weekStartDate: [this.getDefaultTuesdayDate(), [Validators.required, tuesdayValidator]],
-    // Category percentages — fixed 3 fields
-    pct0: [50, [Validators.required, Validators.min(0), Validators.max(100)]],
-    pct1: [30, [Validators.required, Validators.min(0), Validators.max(100)]],
-    pct2: [20, [Validators.required, Validators.min(0), Validators.max(100)]],
+    weekStartDate: [this.getDefaultTuesdayDate(), [Validators.required, this.isTuesdayValidator.bind(this)]],
+    // Category percentages — min 1% each so no category gets 0h
+    pct0: [50, [Validators.required, Validators.min(1), Validators.max(98)]],
+    pct1: [30, [Validators.required, Validators.min(1), Validators.max(98)]],
+    pct2: [20, [Validators.required, Validators.min(1), Validators.max(98)]],
   });
 
-  // ── Computed helpers ───────────────────────────────────────────────────────
+  // ── Computed helpers ──────────────────────────────────────────────────────
+  get selectedMemberIds(): string[] { return [...this.checkedIds()]; }
   get selectedCount(): number { return this.checkedIds().size; }
   get totalHours(): number { return this.selectedCount * 30; }
 
-  get pctValues(): number[] {
-    const v = this.form.value;
-    return [+(v.pct0 ?? 0), +(v.pct1 ?? 0), +(v.pct2 ?? 0)];
-  }
+  get pctClient(): number { return +(this.form.value.pct0 ?? 0); }
+  get pctTech(): number { return +(this.form.value.pct1 ?? 0); }
+  get pctRD(): number { return +(this.form.value.pct2 ?? 0); }
 
-  get pctTotal(): number { return this.pctValues.reduce((a, b) => a + b, 0); }
-  get pctOk(): boolean { return this.pctTotal === 100; }
+  get pctValues(): number[] { return [this.pctClient, this.pctTech, this.pctRD]; }
+
+  pctSum(): number { return this.pctValues.reduce((a, b) => a + b, 0); }
 
   get catHours(): number[] {
     return this.pctValues.map((p) => Math.round((p / 100) * this.totalHours));
   }
 
-  get workPeriod(): string {
-    const v = this.form.value.weekStartDate;
-    if (!v || this.form.controls.weekStartDate.invalid) return '';
-    const tue = v instanceof Date ? v : new Date((v as string) + 'T12:00:00');
-    if (isNaN(tue.getTime())) return '';
-    const wed = new Date(tue); wed.setDate(tue.getDate() + 1);
-    const mon = new Date(tue); mon.setDate(tue.getDate() + 6);
-    const dp = new DatePipe('en-GB');
-    return `Work period: ${dp.transform(wed, 'dd-MM-yyyy')} to ${dp.transform(mon, 'dd-MM-yyyy')}`;
+  /** 'valid' | 'wrong-total' | 'zero-category' */
+  getPctStatus(): 'valid' | 'wrong-total' | 'zero-category' {
+    if (this.pctSum() !== 100) return 'wrong-total';
+    if (this.pctClient < 1 || this.pctTech < 1 || this.pctRD < 1) return 'zero-category';
+    return 'valid';
+  }
+
+  calcBudget(cat: string): number {
+    const idx = this.catConfig.findIndex(c => c.value === cat);
+    if (idx < 0) return 0;
+    return Math.round((this.pctValues[idx] / 100) * this.totalHours);
+  }
+
+  isFormValid(): boolean {
+    return (
+      this.isValidTuesday(this.form.value.weekStartDate) &&
+      this.selectedCount > 0 &&
+      this.pctSum() === 100 &&
+      this.pctClient >= 1 &&
+      this.pctTech >= 1 &&
+      this.pctRD >= 1
+    );
   }
 
   get canSubmit(): boolean {
-    return this.form.controls.weekStartDate.valid
-      && this.selectedCount > 0
-      && this.pctOk
-      && !this.isSubmitting();
+    return this.isFormValid() && !this.isSubmitting();
   }
 
-  // ── Lifecycle ──────────────────────────────────────────────────────────────
+  // ── Date helpers ─────────────────────────────────────────────────────────
+
+  /** Tuesday validator bound as instance method so `this` is accessible */
+  isTuesdayValidator(control: AbstractControl): ValidationErrors | null {
+    if (!control.value) return null;
+    const str = this.formatDateForCheck(control.value);
+    const d = new Date(str + 'T12:00:00');
+    return d.getDay() === 2 ? null : { notTuesday: true };
+  }
+
+  private formatDateForCheck(value: any): string {
+    if (!value) return '';
+    // Always build from LOCAL date parts to avoid UTC timezone shift
+    let d: Date;
+    if (value instanceof Date) {
+      d = value;
+    } else if (typeof value === 'string') {
+      // If already ISO string like "2026-03-10", parse with noon to stay local
+      d = new Date(value.slice(0, 10) + 'T12:00:00');
+    } else {
+      d = new Date(value);
+    }
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
+  isValidTuesday(value: any): boolean {
+    if (!value) return false;
+    const str = this.formatDateForCheck(value);
+    const d = new Date(str + 'T12:00:00');
+    return d.getDay() === 2;
+  }
+
+  /** BUG 1 FIX: Returns a Date object — NOT a "Work period: ..." string */
+  getWorkStart(): Date {
+    const d = new Date(this.formatDateForCheck(this.form.value.weekStartDate) + 'T12:00:00');
+    d.setDate(d.getDate() + 1); // Wednesday
+    return d;
+  }
+
+  getWorkEnd(): Date {
+    const d = new Date(this.formatDateForCheck(this.form.value.weekStartDate) + 'T12:00:00');
+    d.setDate(d.getDate() + 6); // Monday
+    return d;
+  }
+
+  getDayName(value: any): string {
+    if (!value) return '';
+    const str = this.formatDateForCheck(value);
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    return days[new Date(str + 'T12:00:00').getDay()];
+  }
+
+  formatDisplay(value: any): string {
+    if (!value) return '';
+    const str = this.formatDateForCheck(value);
+    const [y, m, d] = str.split('-');
+    return `${d}-${m}-${y}`;
+  }
+
+  // ── Quick preset ─────────────────────────────────────────────────────────
+  setPreset(a: number, b: number, c: number): void {
+    this.form.patchValue({ pct0: a, pct1: b, pct2: c });
+  }
+
+  // ── Lifecycle ─────────────────────────────────────────────────────────────
   ngOnInit(): void {
+    // State guard: this page requires an active cycle in SETUP state
+    const existingCycle = this.cycleService.activeCycle;
+    if (existingCycle && existingCycle.state !== 'SETUP') {
+      this.snack('No cycle awaiting setup.', true);
+      this.router.navigate(['/home']);
+      return;
+    }
+
     this.teamService.getAll().subscribe({
       next: (members) => {
         const active = members.filter((m) => m.isActive);
         this.allMembers.set(active);
-        // All checked by default
         this.checkedIds.set(new Set(active.map((m) => m.id)));
         this.isLoading.set(false);
       },
@@ -160,7 +237,7 @@ export class CycleSetupComponent implements OnInit {
     });
   }
 
-  // ── Member checkbox toggle ─────────────────────────────────────────────────
+  // ── Member checkbox toggle ────────────────────────────────────────────────
   toggleMember(id: string): void {
     this.checkedIds.update((s) => {
       const next = new Set(s);
@@ -171,46 +248,70 @@ export class CycleSetupComponent implements OnInit {
 
   isMemberChecked(id: string): boolean { return this.checkedIds().has(id); }
 
-  // ── Submit: start → setup → open (chained) ────────────────────────────────
+  // ── Submit: start → setup → open (chained) ───────────────────────────────
   onOpenPlanning(): void {
     if (!this.canSubmit) return;
     this.isSubmitting.set(true);
+    this.submitError.set(null);
 
     const dateStr = this.form.value.weekStartDate;
-    const d = dateStr instanceof Date ? dateStr : (dateStr ? new Date((dateStr as string) + 'T12:00:00') : null);
-    const isoDate = d ? d.toISOString().substring(0, 10) : '';
+    // Use LOCAL date parts to avoid UTC timezone shift (e.g. IST midnight → UTC prev day)
+    const d = dateStr instanceof Date
+      ? dateStr
+      : (dateStr ? new Date((dateStr as string).slice(0, 10) + 'T12:00:00') : null);
+    const isoDate = d
+      ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      : '';
     const memberIds = [...this.checkedIds()];
     const pctVals = this.pctValues;
 
-    const categoryBudgets = this.catConfig.map((c, i) => ({
+    const categoryAllocations = this.catConfig.map((c, i) => ({
       category: c.value,
       percentage: pctVals[i],
     }));
 
-    // Chain: start → setup → open
-    this.cycleService.startCycle({ weekStartDate: isoDate })
+    // If there's already a SETUP cycle (e.g. previous partial submit), reuse it
+    // instead of calling startCycle again — avoids "already being planned" error.
+    const cached = this.cycleService.activeCycle;
+    const cachedState = cached?.state ?? cached?.status ?? '';
+    const isAlreadySetup = cached && ['SETUP', 'Setup'].includes(cachedState);
+
+    const start$ = isAlreadySetup
+      ? of(cached!)                                          // reuse existing cycle
+      : this.cycleService.startCycle({ weekStartDate: isoDate });
+
+    start$
       .pipe(
         switchMap((cycle) =>
-          this.cycleService.setupCycle(cycle.id, { memberIds, categoryBudgets })
+          this.cycleService.setupCycle(cycle.id, {
+            planningDate: isoDate,          // ← required by backend, must be the Tuesday
+            memberIds,
+            categoryAllocations,
+          })
         ),
-        switchMap((cycle) =>
-          this.cycleService.openCycle(cycle.id)
-        )
+        switchMap((res: any) => {
+          const cycleId = (res?.data ?? res)?.id ?? this.cycleService.activeCycle?.id ?? '';
+          return this.cycleService.openCycle(cycleId);
+        }),
+        switchMap(() => this.cycleService.loadActive())
       )
       .subscribe({
         next: () => {
           this.isSubmitting.set(false);
-          this.snackBar.open('Planning is open! Team members can now plan their work.', 'Close', { duration: 4500 });
+          this.snackBar.open('✓ Planning is now open! Team members can now plan their work.', 'Close', { duration: 4500 });
           this.router.navigate(['/home']);
         },
         error: (err) => {
           this.isSubmitting.set(false);
-          this.snack(err?.error?.message ?? 'Failed to open planning. Please try again.', true);
+          this.cycleService.loadActive().subscribe();
+          const msg = err?.error?.message ?? 'Failed to open planning. Please try again.';
+          this.submitError.set(msg);
+          this.snack(msg, true);
         },
       });
   }
 
-  // ── Utility ───────────────────────────────────────────────────────────────
+  // ── Utility ──────────────────────────────────────────────────────────────
   private getDefaultTuesdayDate(): Date {
     const today = new Date();
     const day = today.getDay();
@@ -219,13 +320,6 @@ export class CycleSetupComponent implements OnInit {
     tue.setDate(today.getDate() + diff);
     tue.setHours(12, 0, 0, 0);
     return tue;
-  }
-
-  /** Legacy: kept for workPeriod getter but replaced by getDefaultTuesdayDate */
-  private getDefaultTuesday(): Date { return this.getDefaultTuesdayDate(); }
-
-  private fmt(d: Date): string {
-    return d.toISOString().substring(0, 10);
   }
 
   private snack(msg: string, isError = false): void {

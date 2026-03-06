@@ -50,6 +50,7 @@ export class ProgressComponent implements OnInit {
   private readonly authService = inject(AuthService);
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
+  private readonly router = inject(Router);
 
   readonly currentUser = toSignal(this.authService.currentUser$);
 
@@ -128,7 +129,16 @@ export class ProgressComponent implements OnInit {
   }
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
-  ngOnInit(): void { this.load(); }
+  ngOnInit(): void {
+    // State guard: progress requires an active cycle in FROZEN state
+    const cached = this.cycleService.activeCycle;
+    if (!cached || (!['FROZEN', 'Frozen'].includes(cached.state ?? cached.status ?? ''))) {
+      this.snack('No frozen cycle active. Freeze the plan first.', true);
+      this.router.navigate(['/home']);
+      return;
+    }
+    this.load();
+  }
 
   load(): void {
     this.isLoading.set(true);

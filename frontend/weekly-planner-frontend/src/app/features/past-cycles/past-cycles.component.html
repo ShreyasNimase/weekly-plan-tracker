@@ -10,31 +10,32 @@
   </div>
 
   @if (isLoading()) {
-    <div class="flex-center" style="padding: 60px 0;">
-      <mat-spinner diameter="48"></mat-spinner>
-    </div>
+  <div class="flex-center" style="padding: 60px 0;">
+    <mat-spinner diameter="48"></mat-spinner>
+  </div>
   } @else if (cycles().length === 0) {
-    <div class="banner info empty-state" style="text-align: center; padding: 32px 24px">
-      <mat-icon>calendar_today</mat-icon>
-      <span>No past weeks yet.</span>
-    </div>
+  <div class="banner info empty-state" style="text-align: center; padding: 32px 24px">
+    <mat-icon>calendar_today</mat-icon>
+    <span>No past weeks yet.</span>
+  </div>
   } @else {
-    <div class="past-cycles-list">
-      @for (cycle of cycles(); track cycle.id; let last = $last) {
-        <a [routerLink]="['/dashboard', cycle.id]" [queryParams]="{from: 'past'}" class="wpt-card hoverable cycle-card">
-          <div class="cycle-left">
-            <mat-icon class="cycle-icon">calendar_today</mat-icon>
-            <div>
-              <span class="cycle-title">Week of {{ cycle.weekStartDate | date:'MMM d, y' }}</span>
-              <span class="badge" [ngClass]="cycleStatusCls(cycle.status)">{{ cycle.status }}</span>
-            </div>
-          </div>
-          <div class="cycle-right">
-            <span class="member-chip">{{ memberCount(cycle) }} members</span>
-            <mat-icon class="view-arrow">chevron_right</mat-icon>
-          </div>
-        </a>
-      }
-    </div>
+  <div class="past-cycles-list">
+    @for (cycle of cycles(); track cycle.id; let last = $last) {
+    <a [routerLink]="['/dashboard', cycle.id]" [queryParams]="{from: 'past'}" class="wpt-card hoverable cycle-card">
+      <div class="cycle-left">
+        <mat-icon class="cycle-icon">calendar_today</mat-icon>
+        <div>
+          <span class="cycle-title">Week of {{ (cycle.weekStartDate ?? cycle.planningDate) | date:'MMM d, y' }}</span>
+          <span class="badge" [ngClass]="cycleStatusCls(cycle.status ?? cycle.state)">{{ cycle.status ?? cycle.state
+            }}</span>
+        </div>
+      </div>
+      <div class="cycle-right">
+        <span class="member-chip">{{ memberCount(cycle) }} members</span>
+        <mat-icon class="view-arrow">chevron_right</mat-icon>
+      </div>
+    </a>
+    }
+  </div>
   }
 </div>
