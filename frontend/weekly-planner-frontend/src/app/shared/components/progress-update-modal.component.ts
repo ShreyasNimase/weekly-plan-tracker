@@ -24,11 +24,14 @@ const STATUS_OPTIONS = [
 ];
 
 const CAT_META: Record<string, { label: string; cls: string }> = {
-  Feature: { label: 'Feature', cls: 'cat-feature' },
-  Bug: { label: 'Bug', cls: 'cat-bug' },
+  CLIENT_FOCUSED: { label: 'Client Focused', cls: 'cat-client' },
+  TECH_DEBT: { label: 'Tech Debt', cls: 'cat-techdebt' },
+  R_AND_D: { label: 'R\u0026D', cls: 'cat-rnd' },
+  Feature: { label: 'Client Focused', cls: 'cat-client' },
   TechDebt: { label: 'Tech Debt', cls: 'cat-techdebt' },
-  Learning: { label: 'Learning', cls: 'cat-learning' },
-  Other: { label: 'Other', cls: 'cat-other' },
+  Learning: { label: 'R\u0026D', cls: 'cat-rnd' },
+  Bug: { label: 'Bug', cls: 'cat-techdebt' },
+  Other: { label: 'Other', cls: 'cat-rnd' },
 };
 
 @Component({
@@ -106,7 +109,7 @@ const CAT_META: Record<string, { label: string; cls: string }> = {
             [disabled]="form.invalid || isSaving()"
             (click)="save()">
       @if (isSaving()) { <mat-spinner diameter="16"></mat-spinner> Saving… }
-      @else { <mat-icon>save</mat-icon> Save Update }
+      @else { <ng-container><mat-icon>save</mat-icon> Save Update</ng-container> }
     </button>
   </mat-dialog-actions>
 </div>
