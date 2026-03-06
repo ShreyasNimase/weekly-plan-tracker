@@ -1,7 +1,9 @@
+using Microsoft.EntityFrameworkCore;
 using Moq;
 using WeeklyPlanner.Core.DTOs;
 using WeeklyPlanner.Core.Entities;
 using WeeklyPlanner.Core.Interfaces;
+using WeeklyPlanner.Infrastructure.Data;
 using WeeklyPlanner.Infrastructure.Services;
 using Xunit;
 
@@ -15,7 +17,15 @@ public class TeamMemberServiceTests
     public TeamMemberServiceTests()
     {
         _repo = new Mock<ITeamMemberRepository>();
-        _service = new TeamMemberService(_repo.Object);
+
+        // TeamMemberService(repo, context) — context is used only in MakeLeadAsync.
+        // Use an isolated in-memory database so the constructor is satisfied.
+        var dbOptions = new DbContextOptionsBuilder<AppDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+        var context = new AppDbContext(dbOptions);
+
+        _service = new TeamMemberService(_repo.Object, context);
     }
 
     [Fact]
