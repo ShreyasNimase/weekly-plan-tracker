@@ -9,21 +9,23 @@ namespace WeeklyPlanner.Tests;
 
 public class ProgressControllerTests
 {
-    private readonly Mock<ICycleRepository>      _cycleRepo;
-    private readonly Mock<IAssignmentRepository> _assignRepo;
+    private readonly Mock<ICycleRepository> _cycleRepo;
+    private readonly Mock<ITaskAssignmentRepository> _assignRepo;
+    private readonly Mock<IMemberPlanRepository> _memberPlanRepo;
     private readonly Mock<ITeamMemberRepository> _memberRepo;
-    private readonly Mock<IBacklogRepository>    _backlogRepo;
-    private readonly ProgressController          _progressCtrl;
-    private readonly DashboardController         _dashboardCtrl;
+    private readonly Mock<IBacklogRepository> _backlogRepo;
+    private readonly ProgressController _progressCtrl;
+    private readonly DashboardController _dashboardCtrl;
 
     public ProgressControllerTests()
     {
-        _cycleRepo   = new Mock<ICycleRepository>();
-        _assignRepo  = new Mock<IAssignmentRepository>();
-        _memberRepo  = new Mock<ITeamMemberRepository>();
+        _cycleRepo = new Mock<ICycleRepository>();
+        _assignRepo = new Mock<ITaskAssignmentRepository>();
+        _memberPlanRepo = new Mock<IMemberPlanRepository>();
+        _memberRepo = new Mock<ITeamMemberRepository>();
         _backlogRepo = new Mock<IBacklogRepository>();
 
-        _progressCtrl  = new ProgressController(_cycleRepo.Object, _assignRepo.Object);
+        _progressCtrl = new ProgressController(_cycleRepo.Object, _assignRepo.Object, _memberPlanRepo.Object);
         _dashboardCtrl = new DashboardController(
             _cycleRepo.Object, _memberRepo.Object, _backlogRepo.Object, _assignRepo.Object);
     }
