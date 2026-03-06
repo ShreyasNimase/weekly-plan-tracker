@@ -1,0 +1,66 @@
+<div class="page-wrapper">
+  <!-- User greeting -->
+  <div class="home-greeting">
+    <div class="greeting-avatar">{{ (currentUser()?.name ?? 'P').charAt(0).toUpperCase() }}</div>
+    <div>
+      <h1>Good to see you, {{ (currentUser()?.name ?? 'Planner').split(' ')[0] }}!</h1>
+      <p>
+        @if (isLead) {
+          <span class="role-badge lead">Team Lead</span>
+        }
+        @if (!isLead) {
+          <span class="role-badge member">Team Member</span>
+        }
+      </p>
+    </div>
+  </div>
+
+  @if (isLoading()) {
+    <div class="flex-center mt-6">
+      <mat-spinner diameter="48"></mat-spinner>
+    </div>
+  } @else {
+
+    <!-- Active Cycle status bar -->
+    @if (hasCycle) {
+      <div class="banner info cycle-status-bar" [class]="'cycle-' + cycleStatus.toLowerCase()">
+        <mat-icon class="cycle-icon">
+          {{ cycleStatus === 'Planning' ? 'lock_open' : cycleStatus === 'Frozen' ? 'lock' : 'settings' }}
+        </mat-icon>
+        <div class="cycle-text">
+          <strong>Active Cycle</strong>
+          — Week of {{ activeCycle()!.weekStartDate }}
+          <span class="cycle-badge">{{ cycleStatus }}</span>
+        </div>
+      </div>
+    }
+
+    <!-- Info banner -->
+    @if (infoBanner) {
+      <div class="banner" [class]="infoBanner.type">
+        <mat-icon>
+          {{ infoBanner.type === 'success' ? 'check_circle_outline' : infoBanner.type === 'warn' ? 'info' : 'info_outline' }}
+        </mat-icon>
+        <span>{{ infoBanner.text }}</span>
+      </div>
+    }
+
+    <!-- Section label -->
+    <p class="section-label">What do you want to do?</p>
+
+    <!-- Action cards grid -->
+    <div class="cards-grid">
+      @for (card of cards; track card.title) {
+        <div class="action-card" [class.danger-card]="card.danger"
+             (click)="navigate(card)" role="button"
+             [attr.aria-label]="card.title">
+          <div class="action-icon" [class.danger]="card.danger">
+            <mat-icon>{{ card.icon }}</mat-icon>
+          </div>
+          <div class="card-title">{{ card.title }}</div>
+          <div class="card-subtitle">{{ card.desc }}</div>
+        </div>
+      }
+    </div>
+  }
+</div>
