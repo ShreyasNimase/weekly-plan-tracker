@@ -35,12 +35,16 @@ export interface HourCommitResult {
   backlogItemId: string;
 }
 
-const CAT_META: Record<string, { label: string }> = {
-  Feature: { label: 'Feature' },
-  Bug: { label: 'Bug' },
-  TechDebt: { label: 'Tech Debt' },
-  Learning: { label: 'Learning' },
-  Other: { label: 'Other' },
+const CAT_META: Record<string, { label: string; cls: string }> = {
+  CLIENT_FOCUSED: { label: 'Client Focused', cls: 'cat-client' },
+  TECH_DEBT: { label: 'Tech Debt', cls: 'cat-techdebt' },
+  R_AND_D: { label: 'R\u0026D', cls: 'cat-rnd' },
+  // legacy fallbacks
+  Feature: { label: 'Client Focused', cls: 'cat-client' },
+  TechDebt: { label: 'Tech Debt', cls: 'cat-techdebt' },
+  Learning: { label: 'R\u0026D', cls: 'cat-rnd' },
+  Bug: { label: 'Bug', cls: 'cat-techdebt' },
+  Other: { label: 'Other', cls: 'cat-rnd' },
 };
 
 @Component({
@@ -193,7 +197,7 @@ export class HourCommitModalComponent {
     ],
   });
 
-  get catCls(): string { return 'cat-' + (this.data.item.category ?? 'other').toLowerCase().replace(/\s+/g, ''); }
+  get catCls(): string { return CAT_META[this.data.item.category]?.cls ?? 'cat-other'; }
   get catLabel(): string { return CAT_META[this.data.item.category]?.label ?? this.data.item.category; }
   get inputHours(): number { return +(this.form.value.hours ?? 0); }
 
@@ -209,9 +213,9 @@ export class HourCommitModalComponent {
     const call$: import('rxjs').Observable<Assignment> = this.isEdit
       ? this.assignmentService.updateHours(this.data.existingAssignmentId!, { plannedHours: hours })
       : this.assignmentService.claim({
-        cycleMemberId: this.data.cycleMemberId,
+        memberPlanId: this.data.cycleMemberId,  // data.cycleMemberId holds the MemberPlan.Id
         backlogItemId: this.data.item.id,
-        plannedHours: hours,
+        committedHours: hours,
       });
 
     call$.subscribe({
