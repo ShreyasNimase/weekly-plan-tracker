@@ -73,7 +73,10 @@ export class FreezeReviewComponent implements OnInit {
   get categoryBudgets(): CategoryBudget[] { return this.cycle()?.categoryBudgets ?? []; }
   get totalMembers(): number { return this.cycleMembers.length; }
   get totalBudgetHours(): number { return this.cycleMembers.reduce((s, m) => s + m.allocatedHours, 0); }
-  get isFrozen(): boolean { return this.cycle()?.status === 'Frozen'; }
+  get isFrozen(): boolean {
+    const st = this.cycle()?.state ?? this.cycle()?.status ?? '';
+    return ['FROZEN', 'Frozen'].includes(st);
+  }
 
   /** Category summary rows — budget vs. allocated hours in this cycle */
   get categoryRows(): CategoryRow[] {
@@ -107,7 +110,11 @@ export class FreezeReviewComponent implements OnInit {
     const list: ValidationIssue[] = [];
     for (const m of this.cycleMembers) {
       if (m.allocatedHours < 30) {
-        list.push({ text: `${m.name} has ${m.allocatedHours}h allocated (needs ${30 - m.allocatedHours}h more)` });
+        const shortBy = 30 - m.allocatedHours;
+        list.push({ text: `${m.name} has only ${m.allocatedHours}h planned — needs ${shortBy}h more to reach 30h` });
+      } else if (m.allocatedHours > 30) {
+        const over = m.allocatedHours - 30;
+        list.push({ text: `${m.name} has ${m.allocatedHours}h planned — ${over}h over the 30h limit` });
       }
     }
     return list;
@@ -123,6 +130,13 @@ export class FreezeReviewComponent implements OnInit {
       next: (cycle) => {
         if (!cycle) {
           this.snack('No active cycle found.', true);
+          this.router.navigate(['/home']);
+          return;
+        }
+        // State guard: freeze review requires a cycle in PLANNING state
+        const st = cycle.state ?? cycle.status ?? '';
+        if (!['PLANNING', 'Planning'].includes(st)) {
+          this.snack('The cycle is not currently in planning.', true);
           this.router.navigate(['/home']);
           return;
         }

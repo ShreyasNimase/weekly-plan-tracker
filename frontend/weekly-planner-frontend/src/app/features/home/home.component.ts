@@ -1,6 +1,6 @@
 import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
-import { MatCardModule } from '@angular/material/card';
+import { CommonModule } from '@angular/common';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
@@ -8,31 +8,22 @@ import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { AuthService } from '../../core/services/auth.service';
 import { CycleService } from '../../core/services/cycle.service';
-import { DataService } from '../../core/services/data.service';
 import { Cycle } from '../../shared/models/cycle.model';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ConfirmDialogComponent } from '../../shared/dialogs/confirm-dialog.component';
-
-export interface ActionCard {
-  emoji: string;
-  icon: string;
-  title: string;
-  desc: string;
-  route?: string;
-  action?: () => void;
-  danger?: boolean;
-}
+import { CycleStatusCardComponent } from '../../shared/components/cycle-status-card/cycle-status-card.component';
 
 @Component({
   selector: 'app-home',
   standalone: true,
   imports: [
-    MatCardModule,
+    CommonModule,
     MatButtonModule,
     MatIconModule,
     MatProgressSpinnerModule,
     MatDialogModule,
     MatSnackBarModule,
+    CycleStatusCardComponent,
   ],
   templateUrl: './home.component.html',
   styleUrl: './home.component.scss',
@@ -40,7 +31,6 @@ export interface ActionCard {
 export class HomeComponent implements OnInit {
   private readonly authService = inject(AuthService);
   private readonly cycleService = inject(CycleService);
-  private readonly dataService = inject(DataService);
   private readonly router = inject(Router);
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
@@ -49,10 +39,34 @@ export class HomeComponent implements OnInit {
   readonly activeCycle = toSignal(this.cycleService.activeCycle$);
   readonly isLoading = signal(true);
 
-  /** Derived state helpers */
-  get isLead(): boolean { return this.currentUser()?.isLead ?? false; }
-  get cycleStatus(): string { return this.activeCycle()?.status ?? ''; }
-  get hasCycle(): boolean { return !!this.activeCycle(); }
+  // ── Computed helpers ────────────────────────────────────────────────────────
+
+  /** True when the signed-in user is a Team Lead */
+  get isLead(): boolean {
+    return this.currentUser()?.isLead ?? false;
+  }
+
+  /** Cycle state (UPPER_CASE as returned by backend) */
+  get cycleState(): string {
+    return this.activeCycle()?.state ?? '';
+  }
+
+  get hasCycle(): boolean {
+    return !!this.activeCycle();
+  }
+
+  /** True if current user's ID is in the cycle's participatingMemberIds */
+  get isParticipating(): boolean {
+    const userId = this.currentUser()?.id;
+    const ids = this.activeCycle()?.participatingMemberIds ?? [];
+    return !!(userId && ids.includes(userId));
+  }
+
+  get firstName(): string {
+    return this.currentUser()?.name?.split(' ')[0] ?? '';
+  }
+
+  // ── Lifecycle ────────────────────────────────────────────────────────────────
 
   ngOnInit(): void {
     this.cycleService.loadActive().subscribe({
@@ -61,121 +75,64 @@ export class HomeComponent implements OnInit {
     });
   }
 
-  /** Compute the correct set of cards based on role + cycle state */
-  get cards(): ActionCard[] {
-    const status = this.cycleStatus;
+  // ── Navigation ───────────────────────────────────────────────────────────────
 
-    if (this.isLead) {
-      // ── Lead, No cycle ──────────────────────────────────────────────
-      if (!this.hasCycle) {
-        return [
-          { emoji: '🚀', icon: 'rocket_launch', title: 'Start a New Week', desc: 'Set up a new planning cycle.', route: '/cycle/setup' },
-          { emoji: '📋', icon: 'list_alt', title: 'Manage Backlog', desc: 'Add, edit, or browse work items.', route: '/backlog' },
-          { emoji: '👥', icon: 'group', title: 'Manage Team Members', desc: 'Add or remove team members.', route: '/team' },
-          { emoji: '📅', icon: 'history', title: 'View Past Weeks', desc: 'Look at completed planning cycles.', route: '/past-cycles' },
-        ];
-      }
-      // ── Lead, Planning (open) ─────────────────────────────────────
-      if (status === 'Planning') {
-        return [
-          { emoji: '👁️', icon: 'visibility', title: 'Review and Freeze the Plan', desc: 'Check everyone\'s hours and lock the plan.', route: '/freeze-review' },
-          { emoji: '📝', icon: 'edit_note', title: 'Plan My Work', desc: 'Pick backlog items and commit hours.', route: '/planning' },
-          { emoji: '📋', icon: 'list_alt', title: 'Manage Backlog', desc: 'Add, edit, or browse work items.', route: '/backlog' },
-          { emoji: '👥', icon: 'group', title: 'Manage Team Members', desc: 'Add or remove team members.', route: '/team' },
-          { emoji: '📅', icon: 'history', title: 'View Past Weeks', desc: 'Look at completed planning cycles.', route: '/past-cycles' },
-          { emoji: '❌', icon: 'cancel', title: 'Cancel This Week\'s Planning', desc: 'Erase all plans and start over.', action: () => this.openCancelDialog(), danger: true },
-        ];
-      }
-      // ── Lead, Frozen ──────────────────────────────────────────────
-      if (status === 'Frozen') {
-        return [
-          { emoji: '🔒', icon: 'lock', title: 'Review Frozen Plan', desc: 'View the locked plan for this week.', route: '/freeze-review' },
-          { emoji: '📋', icon: 'list_alt', title: 'Manage Backlog', desc: 'Add, edit, or browse work items.', route: '/backlog' },
-          { emoji: '👥', icon: 'group', title: 'Manage Team Members', desc: 'Add or remove team members.', route: '/team' },
-          { emoji: '📅', icon: 'history', title: 'View Past Weeks', desc: 'Look at completed planning cycles.', route: '/past-cycles' },
-        ];
-      }
-      // ── Lead, Setup (cycle created, not configured) ───────────────
-      return [
-        { emoji: '⚙️', icon: 'settings', title: 'Configure This Week', desc: 'Assign team and set category budgets.', route: '/cycle/setup' },
-        { emoji: '📋', icon: 'list_alt', title: 'Manage Backlog', desc: 'Add, edit, or browse work items.', route: '/backlog' },
-        { emoji: '👥', icon: 'group', title: 'Manage Team Members', desc: 'Add or remove team members.', route: '/team' },
-        { emoji: '📅', icon: 'history', title: 'View Past Weeks', desc: 'Look at completed planning cycles.', route: '/past-cycles' },
-      ];
-    }
-
-    // ── Member, No cycle ───────────────────────────────────────────────
-    if (!this.hasCycle) {
-      return [
-        { emoji: '📋', icon: 'list_alt', title: 'Manage Backlog', desc: 'Browse and view work items.', route: '/backlog' },
-        { emoji: '📅', icon: 'history', title: 'View Past Weeks', desc: 'Look at completed planning cycles.', route: '/past-cycles' },
-      ];
-    }
-    // ── Member, Planning ──────────────────────────────────────────────
-    if (status === 'Planning') {
-      return [
-        { emoji: '📝', icon: 'edit_note', title: 'Plan My Work', desc: 'Pick backlog items and commit your 30 hours.', route: '/planning' },
-        { emoji: '📋', icon: 'list_alt', title: 'Manage Backlog', desc: 'Browse and view work items.', route: '/backlog' },
-        { emoji: '📅', icon: 'history', title: 'View Past Weeks', desc: 'Look at completed planning cycles.', route: '/past-cycles' },
-      ];
-    }
-    // ── Member, Frozen ─────────────────────────────────────────────────
-    if (status === 'Frozen') {
-      return [
-        { emoji: '📝', icon: 'trending_up', title: 'Update My Progress', desc: 'Log your task completion and progress.', route: '/progress' },
-        { emoji: '📅', icon: 'history', title: 'View Past Weeks', desc: 'Look at completed planning cycles.', route: '/past-cycles' },
-      ];
-    }
-    // Member in Setup cycle — nothing actionable yet
-    return [
-      { emoji: '📅', icon: 'history', title: 'View Past Weeks', desc: 'Look at completed planning cycles.', route: '/past-cycles' },
-    ];
+  goToSetup(): void { this.router.navigate(['/cycle/setup']); }
+  goToBacklog(): void { this.router.navigate(['/backlog']); }
+  goToTeam(): void { this.router.navigate(['/team']); }
+  goToPastCycles(): void { this.router.navigate(['/past-cycles']); }
+  goToPlanning(): void { this.router.navigate(['/planning']); }
+  goToFreezeReview(): void { this.router.navigate(['/freeze-review']); }
+  goToProgress(): void { this.router.navigate(['/progress']); }
+  goToDashboard(): void {
+    const id = this.activeCycle()?.id;
+    if (id) this.router.navigate(['/dashboard', id]);
   }
 
-  /** Info banner text */
-  get infoBanner(): { text: string; type: 'info' | 'warn' | 'success' } | null {
-    if (this.isLead) {
-      if (!this.hasCycle) return { text: 'No planning weeks yet. Click "Start a New Week" to begin!', type: 'info' };
-      if (this.cycleStatus === 'Planning') return { text: 'Planning is open! Team members can now plan their work.', type: 'success' };
-      if (this.cycleStatus === 'Setup') return { text: 'Cycle created! Configure team members and category budgets to open planning.', type: 'warn' };
-    } else {
-      if (!this.hasCycle) return { text: 'There\'s no active plan for you right now. Check back on Tuesday or ask your Team Lead.', type: 'info' };
+  // ── Cycle actions ─────────────────────────────────────────────────────────
+
+  startNewWeek(): void {
+    if (this.activeCycle()) {
+      this.snack('There is already an active week. Finish or cancel it first.', true);
+      return;
     }
-    return null;
+    // Backend auto-calculates next Tuesday; weekStartDate is ignored server-side
+    this.cycleService.startCycle({ weekStartDate: '' }).subscribe({
+      next: () => this.router.navigate(['/cycle/setup']),
+      error: (err) => this.snack(err?.error?.message ?? 'Failed to start cycle.', true),
+    });
   }
 
-  navigate(card: ActionCard): void {
-    if (card.action) {
-      card.action();
-    } else if (card.route) {
-      this.router.navigate([card.route]);
-    }
-  }
-
-  /** Returns a left-border accent color per card type */
-  getCardBorderColor(card: ActionCard): string {
-    const colorMap: Record<string, string> = {
-      rocket_launch: '#2563EB',
-      list_alt: '#7C3AED',
-      group: '#0891B2',
-      history: '#6B7280',
-      lock: '#16A34A',
-      visibility: '#16A34A',
-      edit_note: '#D97706',
-      trending_up: '#D97706',
-      cancel: '#EF4444',
-      settings: '#6B7280',
-    };
-    if (card.danger) return '#EF4444';
-    return colorMap[card.icon] ?? '#2563EB';
-  }
-
-  private openCancelDialog(): void {
+  confirmCancelSetup(): void {
     this.dialog.open(ConfirmDialogComponent, {
       width: '440px',
       data: {
-        title: 'Cancel This Week\'s Planning?',
-        message: 'This will delete the current cycle and all plans. Team members will lose their task assignments. This cannot be undone.',
+        title: 'Cancel This Setup?',
+        message: 'The cycle will be removed. You can start a new one anytime.',
+        confirmText: 'Yes, Cancel Setup',
+        confirmColor: 'warn',
+        icon: 'warning',
+      },
+    }).afterClosed().subscribe((confirmed: boolean) => {
+      if (!confirmed) return;
+      const cycle = this.activeCycle();
+      if (!cycle) return;
+      this.cycleService.cancelCycle(cycle.id).subscribe({
+        next: () => {
+          this.snack('Setup cancelled.');
+          this.cycleService.loadActive().subscribe();
+        },
+        error: (err) => this.snack(err?.error?.message ?? 'Cancel failed.', true),
+      });
+    });
+  }
+
+  confirmCancelPlanning(): void {
+    this.dialog.open(ConfirmDialogComponent, {
+      width: '440px',
+      data: {
+        title: "Cancel This Week's Planning?",
+        message: 'This will erase ALL assignments for every team member. Backlog items will go back to Available. This cannot be undone.',
         confirmText: 'Yes, Cancel Planning',
         confirmColor: 'warn',
         icon: 'warning',
@@ -186,14 +143,45 @@ export class HomeComponent implements OnInit {
       if (!cycle) return;
       this.cycleService.cancelCycle(cycle.id).subscribe({
         next: () => {
-          this.snackBar.open('Planning cycle cancelled.', 'Close', { duration: 4000 });
-          // Reload active cycle (will become null)
+          this.snack('Planning cancelled. All assignments cleared.');
           this.cycleService.loadActive().subscribe();
         },
-        error: (err) => {
-          this.snackBar.open(err?.error?.message ?? 'Cancel failed.', 'Dismiss', { duration: 5000, panelClass: ['snack-error'] });
-        },
+        error: (err) => this.snack(err?.error?.message ?? 'Cancel failed.', true),
       });
+    });
+  }
+
+  confirmFinishWeek(): void {
+    this.dialog.open(ConfirmDialogComponent, {
+      width: '440px',
+      data: {
+        title: 'Finish This Week?',
+        message: 'This will mark the week as complete. Completed tasks will be archived. Unfinished tasks return to the backlog.',
+        confirmText: 'Yes, Finish the Week',
+        confirmColor: 'primary',
+        icon: 'task_alt',
+      },
+    }).afterClosed().subscribe((confirmed: boolean) => {
+      if (!confirmed) return;
+      const cycle = this.activeCycle();
+      if (!cycle) return;
+      this.cycleService.completeCycle(cycle.id).subscribe({
+        next: () => {
+          this.snack('✓ Week complete! Great work, team.');
+          this.cycleService.loadActive().subscribe();
+          this.router.navigate(['/home']);
+        },
+        error: (err) => this.snack(err?.error?.message ?? 'Failed to complete cycle.', true),
+      });
+    });
+  }
+
+  // ── Private ──────────────────────────────────────────────────────────────────
+
+  private snack(msg: string, isError = false): void {
+    this.snackBar.open(msg, isError ? 'Dismiss' : 'Close', {
+      duration: isError ? 6000 : 4000,
+      panelClass: isError ? ['snack-error'] : [],
     });
   }
 }

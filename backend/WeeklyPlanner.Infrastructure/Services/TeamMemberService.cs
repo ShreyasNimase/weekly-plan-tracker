@@ -1,17 +1,21 @@
+using Microsoft.EntityFrameworkCore;
 using WeeklyPlanner.Core.DTOs;
 using WeeklyPlanner.Core.Entities;
 using WeeklyPlanner.Core.Interfaces;
 using WeeklyPlanner.Core.Services;
+using WeeklyPlanner.Infrastructure.Data;
 
 namespace WeeklyPlanner.Infrastructure.Services;
 
 public class TeamMemberService : ITeamMemberService
 {
     private readonly ITeamMemberRepository _repo;
+    private readonly AppDbContext _context;
 
-    public TeamMemberService(ITeamMemberRepository repo)
+    public TeamMemberService(ITeamMemberRepository repo, AppDbContext context)
     {
         _repo = repo;
+        _context = context;
     }
 
     public async Task<(TeamMemberDto? Result, string? Error)> CreateAsync(CreateTeamMemberRequest request, CancellationToken cancellationToken = default)
@@ -81,12 +85,10 @@ public class TeamMemberService : ITeamMemberService
         if (!member.IsActive)
             return (null, "Cannot make an inactive member the lead.");
 
-        var allActive = await _repo.GetAllActiveAsync(cancellationToken);
-        foreach (var m in allActive.Where(m => m.IsLead && m.Id != id))
-        {
-            m.IsLead = false;
-            await _repo.UpdateAsync(m, cancellationToken);
-        }
+        // Atomically clear all leads then set this member as lead
+        await _context.TeamMembers
+            .ExecuteUpdateAsync(s => s.SetProperty(m => m.IsLead, false), cancellationToken);
+
         member.IsLead = true;
         await _repo.UpdateAsync(member, cancellationToken);
         return (ToDto(member), null);
@@ -100,11 +102,14 @@ public class TeamMemberService : ITeamMemberService
         if (!member.IsActive)
             return (null, "Member is already inactive.");
 
+        // Guard: cannot deactivate the Team Lead — must transfer lead first
+        if (member.IsLead)
+            return (null, "Cannot deactivate the Team Lead. Please assign a new lead first.");
+
         if (await _repo.IsInActiveCycleAsync(id, cancellationToken))
             return (null, "This person is part of an active plan right now.");
 
         member.IsActive = false;
-        member.IsLead = false;
         await _repo.UpdateAsync(member, cancellationToken);
         return (ToDto(member), null);
     }

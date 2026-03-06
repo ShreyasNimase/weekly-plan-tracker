@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { BehaviorSubject, Observable, tap, catchError, of } from 'rxjs';
+import { BehaviorSubject, Observable, tap, catchError, of, map } from 'rxjs';
 import { Cycle, StartCycleDto, SetupCycleDto } from '../../shared/models/cycle.model';
 import { environment } from '../../../environments/environment';
 
@@ -19,7 +19,7 @@ export class CycleService {
         return this._activeCycle.value;
     }
 
-    /** Load and cache the active cycle from the API (swallows 404) */
+    /** Load and cache the active cycle from the API (swallows errors) */
     loadActive(): Observable<Cycle | null> {
         return this.http.get<Cycle>(`${this.apiUrl}/active`).pipe(
             tap((cycle) => this._activeCycle.next(cycle)),
@@ -28,6 +28,11 @@ export class CycleService {
                 return of(null);
             })
         );
+    }
+
+    /** Alias for loadActive() */
+    loadActiveCycle(): Observable<Cycle | null> {
+        return this.loadActive();
     }
 
     /** Clear the cached active cycle */
@@ -41,16 +46,24 @@ export class CycleService {
             .pipe(tap((cycle) => this._activeCycle.next(cycle)));
     }
 
+    /** Backend returns { success, message, data: CycleDto } for setup — unwrap .data */
     setupCycle(id: string, dto: SetupCycleDto): Observable<Cycle> {
         return this.http
-            .put<Cycle>(`${this.apiUrl}/${id}/setup`, dto)
-            .pipe(tap((cycle) => this._activeCycle.next(cycle)));
+            .put<any>(`${this.apiUrl}/${id}/setup`, dto)
+            .pipe(
+                map((res) => res?.data ?? res),
+                tap((cycle) => this._activeCycle.next(cycle))
+            );
     }
 
+    /** Backend returns { success, message, data: CycleDto } for open — unwrap .data */
     openCycle(id: string): Observable<Cycle> {
         return this.http
-            .put<Cycle>(`${this.apiUrl}/${id}/open`, {})
-            .pipe(tap((cycle) => this._activeCycle.next(cycle)));
+            .put<any>(`${this.apiUrl}/${id}/open`, {})
+            .pipe(
+                map((res) => res?.data ?? res),
+                tap((cycle) => this._activeCycle.next(cycle))
+            );
     }
 
     freezeCycle(id: string): Observable<Cycle> {

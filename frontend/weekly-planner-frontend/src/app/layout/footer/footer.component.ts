@@ -8,6 +8,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { DataService } from '../../core/services/data.service';
 import { AuthService } from '../../core/services/auth.service';
+import { CycleService } from '../../core/services/cycle.service';
 import { ConfirmDialogComponent } from '../../shared/dialogs/confirm-dialog.component';
 import { ImportDialogComponent } from '../../shared/dialogs/import-dialog.component';
 
@@ -28,6 +29,7 @@ import { ImportDialogComponent } from '../../shared/dialogs/import-dialog.compon
 export class FooterComponent {
     private readonly dataService = inject(DataService);
     private readonly authService = inject(AuthService);
+    private readonly cycleService = inject(CycleService);
     private readonly dialog = inject(MatDialog);
     private readonly snackBar = inject(MatSnackBar);
     private readonly router = inject(Router);
@@ -64,6 +66,7 @@ export class FooterComponent {
         }).afterClosed().subscribe((imported: boolean) => {
             if (imported) {
                 this.authService.clearUser();
+                this.cycleService.clearActive();
                 this.snack('Data imported! Please select your identity again.');
                 this.router.navigate(['/identity']);
             }
@@ -75,8 +78,8 @@ export class FooterComponent {
         this.dialog.open(ConfirmDialogComponent, {
             width: '440px',
             data: {
-                title: 'Seed Sample Data',
-                message: 'This will REPLACE all existing data with 4 team members and 10 backlog items. Any current team members, backlog, cycles, and assignments will be erased.',
+                title: 'Load Sample Data',
+                message: 'This will REPLACE all existing data with 4 team members and 10 backlog items. Any current team, backlog, cycles, and assignments will be erased.',
                 confirmText: 'Replace & Seed',
                 confirmColor: 'primary',
                 icon: 'science',
@@ -84,9 +87,11 @@ export class FooterComponent {
         }).afterClosed().subscribe((confirmed: boolean) => {
             if (!confirmed) return;
             this.dataService.seedData().subscribe({
-                next: (res) => {
-                    this.snack(`Sample data seeded (${res.teamMembers} members, ${res.backlogItems} backlog items)!`);
+                next: () => {
+                    // Clear all frontend state
                     this.authService.clearUser();
+                    this.cycleService.clearActive();
+                    this.snack('✓ Sample data loaded! Pick a person to get started.');
                     this.router.navigate(['/identity']);
                 },
                 error: (err) => this.snack(err?.error?.message ?? 'Seed failed.', true),
@@ -109,8 +114,12 @@ export class FooterComponent {
             if (!confirmed) return;
             this.dataService.resetApp().subscribe({
                 next: () => {
+                    // Clear all frontend state
                     this.authService.clearUser();
-                    this.snack('App reset. All data erased.');
+                    this.cycleService.clearActive();
+                    sessionStorage.clear();
+                    localStorage.removeItem('wpt-theme');
+                    this.snack('App reset. Starting fresh.');
                     this.router.navigate(['/setup']);
                 },
                 error: (err) => this.snack(err?.error?.message ?? 'Reset failed.', true),

@@ -62,12 +62,56 @@
   }
 }
 
+/* New icon variants used by the rewritten template */
+.action-icon.primary {
+  background: var(--primary);
+
+  mat-icon {
+    color: #fff;
+  }
+}
+
+.action-icon.success {
+  background: var(--success-light, rgba(22, 163, 74, 0.1));
+
+  mat-icon {
+    color: var(--success, #16a34a);
+  }
+}
+
+.action-icon.muted {
+  background: var(--bg-surface-2);
+
+  mat-icon {
+    color: var(--text-muted);
+  }
+}
+
+/* Primary-highlighted action card */
+.action-card.primary-card {
+  border-color: var(--primary);
+  background: var(--primary-light, rgba(79, 70, 229, 0.06));
+
+  .card-title {
+    color: var(--primary);
+  }
+}
+
+/* Greeting badges row */
+.greeting-badges {
+  display: flex;
+  gap: 6px;
+  margin-top: 2px;
+}
+
 .cycle-status-bar.cycle-planning {
   border-left-color: var(--primary);
 }
+
 .cycle-status-bar.cycle-frozen {
   border-left-color: var(--info);
 }
+
 .cycle-status-bar.cycle-setup {
   border-left-color: var(--warning);
 }

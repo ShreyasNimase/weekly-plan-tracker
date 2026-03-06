@@ -29,7 +29,9 @@ export class PastCyclesComponent implements OnInit {
     this.cycleService.getHistory().subscribe({
       next: (cycles) => {
         // Sort newest first
-        this.cycles.set([...cycles].sort((a, b) => b.weekStartDate.localeCompare(a.weekStartDate)));
+        this.cycles.set([...cycles].sort((a, b) =>
+          (b.weekStartDate ?? b.planningDate ?? '').localeCompare(a.weekStartDate ?? a.planningDate ?? '')
+        ));
         this.isLoading.set(false);
       },
       error: () => {
@@ -39,12 +41,15 @@ export class PastCyclesComponent implements OnInit {
     });
   }
 
-  cycleStatusCls(status: string): string {
-    return {
+  cycleStatusCls(status: string | undefined): string {
+    return ({
       Completed: 'badge-cycle-completed',
       Frozen: 'badge-cycle-frozen',
       Planning: 'badge-cycle-open',
-    }[status] ?? '';
+      COMPLETED: 'badge-cycle-completed',
+      FROZEN: 'badge-cycle-frozen',
+      PLANNING: 'badge-cycle-open',
+    } as Record<string, string>)[status ?? ''] ?? '';
   }
 
   memberCount(cycle: Cycle): number { return cycle.members?.length ?? 0; }
