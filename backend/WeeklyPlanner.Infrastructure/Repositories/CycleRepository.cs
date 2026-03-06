@@ -1,11 +1,13 @@
 using Microsoft.EntityFrameworkCore;
 using WeeklyPlanner.Core.Entities;
-using WeeklyPlanner.Core.Enums;
 using WeeklyPlanner.Core.Interfaces;
 using WeeklyPlanner.Infrastructure.Data;
 
 namespace WeeklyPlanner.Infrastructure.Repositories;
 
+/// <summary>
+/// Repository for planning cycles. Call <see cref="IUnitOfWork.SaveChangesAsync"/> after add/update/delete/setup.
+/// </summary>
 public class CycleRepository : ICycleRepository
 {
     private readonly AppDbContext _context;
@@ -15,98 +17,98 @@ public class CycleRepository : ICycleRepository
         _context = context;
     }
 
-    public async Task<PlanningCycle> AddAsync(PlanningCycle cycle)
+    /// <inheritdoc />
+    public async Task<PlanningCycle> AddAsync(PlanningCycle cycle, CancellationToken cancellationToken = default)
     {
         _context.PlanningCycles.Add(cycle);
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(cancellationToken);
         return cycle;
     }
 
-    public async Task<PlanningCycle?> GetActiveAsync()
+    /// <inheritdoc />
+    public async Task<PlanningCycle?> GetActiveAsync(CancellationToken cancellationToken = default)
     {
         return await _context.PlanningCycles
-            .Include(c => c.CycleMembers)
-                .ThenInclude(cm => cm.TeamMember)
-            .Include(c => c.CategoryBudgets)
-            .FirstOrDefaultAsync(c =>
-                c.Status != CycleStatus.Completed &&
-                c.Status != CycleStatus.Cancelled);
+            .Include(c => c.CycleMembers!)
+            .ThenInclude(cm => cm.Member)
+            .Include(c => c.CategoryAllocations)
+            .Include(c => c.MemberPlans!)
+            .ThenInclude(mp => mp.Member)
+            .Include(c => c.MemberPlans!)
+            .ThenInclude(mp => mp.TaskAssignments!)
+            .FirstOrDefaultAsync(c => c.State == "SETUP" || c.State == "PLANNING" || c.State == "FROZEN", cancellationToken);
     }
 
-    public async Task<PlanningCycle?> GetByIdAsync(Guid id)
+    /// <inheritdoc />
+    public async Task<PlanningCycle?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         return await _context.PlanningCycles
-            .Include(c => c.CycleMembers)
-                .ThenInclude(cm => cm.TeamMember)
-            .Include(c => c.CategoryBudgets)
-            .FirstOrDefaultAsync(c => c.Id == id);
+            .Include(c => c.CycleMembers!)
+            .ThenInclude(cm => cm.Member)
+            .Include(c => c.CategoryAllocations)
+            .Include(c => c.MemberPlans!)
+            .ThenInclude(mp => mp.Member)
+            .Include(c => c.MemberPlans!)
+            .ThenInclude(mp => mp.TaskAssignments!)
+            .FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
     }
 
-    public async Task<PlanningCycle> UpdateAsync(PlanningCycle cycle)
+    /// <inheritdoc />
+    public async Task<PlanningCycle> UpdateAsync(PlanningCycle cycle, CancellationToken cancellationToken = default)
     {
-        // If already tracked (loaded via GetByIdAsync with Include), EF detects
-        // all changes automatically — calling .Update() would re-mark as Modified
-        // and cause DbUpdateConcurrencyException when children were also mutated.
         if (_context.Entry(cycle).State == EntityState.Detached)
-        {
             _context.PlanningCycles.Update(cycle);
-        }
-
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(cancellationToken);
         return cycle;
     }
 
-    public async Task DeleteAsync(Guid id)
+    /// <inheritdoc />
+    public async Task DeleteAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var cycle = await _context.PlanningCycles.FindAsync(id);
+        var cycle = await _context.PlanningCycles.FindAsync([id], cancellationToken);
         if (cycle is not null)
         {
-            cycle.Status = CycleStatus.Cancelled;
-            await _context.SaveChangesAsync();
+            _context.PlanningCycles.Remove(cycle);
+            await _context.SaveChangesAsync(cancellationToken);
         }
     }
 
-    public async Task SetupMembersAndBudgetsAsync(
-        PlanningCycle cycle,
-        List<CycleMember> members,
-        List<CategoryBudget> budgets)
+    /// <inheritdoc />
+    public async Task<IEnumerable<PlanningCycle>> GetHistoryAsync(CancellationToken cancellationToken = default)
     {
-        // Explicitly remove existing children so EF issues DELETE statements
+        return await _context.PlanningCycles
+            .Include(c => c.CycleMembers!)
+            .ThenInclude(cm => cm.Member)
+            .Include(c => c.CategoryAllocations)
+            .Where(c => c.State == "FROZEN" || c.State == "COMPLETED")
+            .OrderByDescending(c => c.PlanningDate)
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> HasActiveCycleAsync(CancellationToken cancellationToken = default)
+    {
+        return await _context.PlanningCycles
+            .AnyAsync(c => c.State == "SETUP" || c.State == "PLANNING" || c.State == "FROZEN", cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task SetupMembersAndAllocationsAsync(PlanningCycle cycle, List<CycleMember> members, List<CategoryAllocation> allocations, CancellationToken cancellationToken = default)
+    {
         _context.CycleMembers.RemoveRange(
             _context.CycleMembers.Where(cm => cm.CycleId == cycle.Id));
-        _context.CategoryBudgets.RemoveRange(
-            _context.CategoryBudgets.Where(cb => cb.CycleId == cycle.Id));
+        _context.CategoryAllocations.RemoveRange(
+            _context.CategoryAllocations.Where(ca => ca.CycleId == cycle.Id));
 
-        // Assign the CycleId to new children
-        foreach (var m in members)  m.CycleId = cycle.Id;
-        foreach (var b in budgets)  b.CycleId = cycle.Id;
+        foreach (var m in members) m.CycleId = cycle.Id;
+        foreach (var a in allocations) a.CycleId = cycle.Id;
 
         _context.CycleMembers.AddRange(members);
-        _context.CategoryBudgets.AddRange(budgets);
+        _context.CategoryAllocations.AddRange(allocations);
 
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(cancellationToken);
 
-        // Refresh navigation properties in memory
-        cycle.CycleMembers  = members;
-        cycle.CategoryBudgets = budgets;
-    }
-
-    public async Task<IEnumerable<PlanningCycle>> GetHistoryAsync()
-    {
-        return await _context.PlanningCycles
-            .Include(c => c.CycleMembers)
-                .ThenInclude(cm => cm.TeamMember)
-            .Include(c => c.CategoryBudgets)
-            .Where(c => c.Status == CycleStatus.Completed || c.Status == CycleStatus.Cancelled)
-            .OrderByDescending(c => c.WeekStartDate)
-            .ToListAsync();
-    }
-
-    public async Task<bool> HasActiveCycleAsync()
-    {
-        return await _context.PlanningCycles
-            .AnyAsync(c =>
-                c.Status != CycleStatus.Completed &&
-                c.Status != CycleStatus.Cancelled);
+        cycle.CycleMembers = members;
+        cycle.CategoryAllocations = allocations;
     }
 }
