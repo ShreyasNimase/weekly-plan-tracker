@@ -3,8 +3,8 @@
 A full-stack web application that helps engineering teams plan and track their weekly sprint work. A **Team Lead** manages the planning cycle, and **team members** pick backlog items and commit hours each week.
 
 **Live URLs**
-- 🌐 Frontend: [witty-island-0efff4f00.1.azurestaticapps.net](https://witty-island-0efff4f00.1.azurestaticapps.net)
-- 🔌 API: [weekly-planner-api-01-ebemgka8hmaza0hy.centralindia-01.azurewebsites.net/api](https://weekly-planner-api-01-ebemgka8hmaza0hy.centralindia-01.azurewebsites.net/api)
+- 🌐 Frontend: [calm-pebble-07fdfd700.1.azurestaticapps.net](https://calm-pebble-07fdfd700.1.azurestaticapps.net)
+- 🔌 API: [weekly-planner-api-03-hscrbeepegbefndu.centralindia-01.azurewebsites.net/api](https://weekly-planner-api-03-hscrbeepegbefndu.centralindia-01.azurewebsites.net/api)
 
 ---
 
@@ -118,9 +118,33 @@ Angular App
 │   ├── backlog/         → Manage Backlog (CRUD + filters)
 │   ├── cycle/           → Cycle Setup + Freeze Review
 │   ├── dashboard/       → Category & member drill-down
-│   └── progress/        → Task progress updates (frozen phase)
+│   ├── progress/        → Task progress updates (frozen phase)
+│   └── past-cycles/     → Historical cycle viewer
 └── shared/              → Models, enums, reusable components
 ```
+
+### Frontend — Routes
+
+| Route | Guard | Description |
+|---|---|---|
+| `/` | — | Startup redirect (checks DB → setup / identity / home) |
+| `/setup` | — | Initial team setup |
+| `/identity` | setupGuard | Select your user / identity |
+| `/home` | auth | Role-specific home dashboard |
+| `/team` | auth + lead | Manage team members |
+| `/backlog` | auth | Backlog list |
+| `/backlog/edit` | auth | Create a new backlog item |
+| `/backlog/edit/:id` | auth | Edit an existing backlog item |
+| `/cycle/setup` | auth + lead | Configure a new cycle |
+| `/planning` | auth | Plan My Work (view assigned items) |
+| `/planning/pick` | auth | Pick a backlog item to claim |
+| `/freeze-review` | auth + lead | Review member plans & freeze |
+| `/progress` | auth | Update task progress (frozen phase) |
+| `/dashboard` | auth | Current cycle dashboard |
+| `/dashboard/:cycleId` | auth | Historical cycle dashboard |
+| `/dashboard/:cycleId/category/:cat` | auth | Category drill-down |
+| `/dashboard/:cycleId/member/:memberId` | auth | Member drill-down |
+| `/past-cycles` | auth | View completed past cycles |
 
 ---
 
@@ -200,7 +224,8 @@ dotnet publish WeeklyPlanner.API -c Release -o ./publish
 ## ☁️ Deployment
 
 ### Frontend → Azure Static Web Apps
-Deploy the `dist/weekly-planner-frontend/browser/` folder.
+Deploy is handled automatically via GitHub Actions (`.github/workflows/azure-static-web-apps-calm-pebble-07fdfd700.yml`).  
+The `dist/weekly-planner-frontend/browser/` folder is deployed on every push to `main`.
 
 ### Backend → Azure App Service
 1. Publish the .NET project
@@ -209,7 +234,7 @@ Deploy the `dist/weekly-planner-frontend/browser/` folder.
    > Name: `DefaultConnection` · Type: `SQLAzure`
 
 ### CORS
-`appsettings.Production.json` is already configured to allow only the Azure Static Web App origin.
+`appsettings.Production.json` restricts CORS to the production Azure Static Web App origin only.
 
 ---
 
@@ -219,12 +244,15 @@ Deploy the `dist/weekly-planner-frontend/browser/` folder.
 |---|---|---|
 | `GET` | `/api/team-members` | List all team members |
 | `POST` | `/api/team-members` | Add a team member |
+| `PUT` | `/api/team-members/{id}/make-lead` | Promote a member to Team Lead |
+| `PUT` | `/api/team-members/{id}/deactivate` | Deactivate a team member |
 | `GET` | `/api/cycles/active` | Get the current active cycle |
 | `POST` | `/api/cycles/start` | Start a new cycle (Lead) |
 | `PUT` | `/api/cycles/{id}/setup` | Configure cycle (Lead) |
 | `PUT` | `/api/cycles/{id}/open` | Open planning (Lead) |
 | `PUT` | `/api/cycles/{id}/freeze` | Freeze the plan (Lead) |
 | `PUT` | `/api/cycles/{id}/complete` | Complete the cycle (Lead) |
+| `GET` | `/api/cycles/past` | List completed cycles |
 | `GET` | `/api/backlog` | List backlog items |
 | `POST` | `/api/backlog` | Create a backlog item |
 | `PUT` | `/api/backlog/{id}` | Update a backlog item |
@@ -232,9 +260,11 @@ Deploy the `dist/weekly-planner-frontend/browser/` folder.
 | `POST` | `/api/assignments` | Claim a backlog item (Member) |
 | `PUT` | `/api/assignments/{id}/progress` | Update task progress (Member) |
 | `DELETE` | `/api/assignments/{id}` | Remove assignment (Member) |
+| `GET` | `/api/assignments` | List assignments for current member/cycle |
 | `PUT` | `/api/member-plans/{id}/ready` | Mark plan as ready (Member) |
 | `GET` | `/api/cycles/{id}/progress` | Category progress for cycle |
 | `GET` | `/api/cycles/{id}/members/{memberId}/progress` | Member progress |
+| `GET` | `/api/dashboard/{cycleId}` | Dashboard data for a cycle |
 
 ---
 
@@ -250,14 +280,14 @@ Deploy the `dist/weekly-planner-frontend/browser/` folder.
   "Cors": {
     "AllowedOrigins": [
       "http://localhost:4200",
-      "https://weekly-planner-frontend-01.azurestaticapps.net"
+      "https://calm-pebble-07fdfd700.1.azurestaticapps.net"
     ]
   }
 }
 ```
 
 ### `appsettings.Production.json`
-- CORS restricted to Azure Static Web App only
+- CORS restricted to Azure Static Web App origin only
 - Log level set to `Warning`
 - Connection string set via **Azure App Service Configuration** (not in file)
 
@@ -269,8 +299,3 @@ Deploy the `dist/weekly-planner-frontend/browser/` folder.
 - Set the production connection string via Azure App Service → Configuration (not in source code)
 - Rotate any credentials that were previously committed to git history
 
----
-
-## 📄 License
-
-MIT
